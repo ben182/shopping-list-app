@@ -10,6 +10,7 @@ use App\Icons\Ios;
 use App\Liste\EigeneListe;
 use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
+use App\Mealie\Eintrag;
 use App\Mealie\Fehler;
 use App\Mealie\Fehlerzustand;
 use App\Mealie\Sitzung;
@@ -97,7 +98,8 @@ class Einkaufen extends NativeComponent
     }
 
     /**
-     * Rechts in der Top-Bar: „Alles abhaken“, solange es etwas abzuhaken gibt,
+     * Rechts in der Top-Bar: „Alles abhaken“, solange irgendetwas offen ist —
+     * eigene Artikel oder offene Mealie-Artikel —,
      * und das Zahnrad — der einzige Weg zu den Einstellungen, der von überall
      * erreichbar ist.
      */
@@ -105,7 +107,7 @@ class Einkaufen extends NativeComponent
     {
         $optionen = NavBarOptions::make();
 
-        if ($this->liste()->anzahl() > 0) {
+        if ($this->uebersicht()->anzahl() > 0) {
             $optionen->action(
                 NavAction::make('alles-abhaken')
                     ->icon(ios: Ios::CheckmarkCircle, android: Android::DoneAll)
@@ -221,17 +223,16 @@ class Einkaufen extends NativeComponent
      */
     public function alleAbhakenBestaetigen(): void
     {
-        $anzahl = $this->liste()->anzahl();
+        $eigene = $this->liste()->anzahl();
+        $mealie = count($this->mealieZumAbhaken());
 
-        if ($anzahl === 0) {
+        if ($eigene === 0 && $mealie === 0) {
             return;
         }
 
         Dialog::alert(
             'Alles abhaken?',
-            $anzahl === 1
-                ? '1 Artikel wandert zurück in den Vorrat.'
-                : $anzahl.' Artikel wandern zurück in den Vorrat.',
+            $this->alleAbhakenFrage($eigene, $mealie),
             [
                 ['label' => 'Abbrechen', 'style' => 'cancel'],
                 ['label' => 'Abhaken', 'style' => 'default'],
@@ -243,8 +244,101 @@ class Einkaufen extends NativeComponent
 
             $this->liste()->alleEntfernen();
 
-            unset($this->abschnitte);
+            $this->mealieAlleAbhaken();
+
+            $this->listeNeuZeichnen();
         });
+    }
+
+    /**
+     * Der Dialogtext: ein Satz je Seite, und jeder nur, wenn er etwas zu
+     * sagen hat.
+     */
+    private function alleAbhakenFrage(int $eigene, int $mealie): string
+    {
+        $saetze = [];
+
+        if ($eigene > 0) {
+            $saetze[] = $eigene === 1
+                ? '1 eigener Artikel wandert zurück in den Vorrat.'
+                : $eigene.' eigene Artikel wandern zurück in den Vorrat.';
+        }
+
+        if ($mealie > 0) {
+            $saetze[] = $mealie === 1
+                ? '1 Mealie-Artikel wird abgehakt.'
+                : $mealie.' Mealie-Artikel werden abgehakt.';
+        }
+
+        return implode(' ', $saetze);
+    }
+
+    /**
+     * Die offenen Mealie-Artikel, die „Alles abhaken“ mitnimmt. Leer, solange
+     * das Banner steht oder kein Token hinterlegt ist: dann kann die App
+     * Mealie nichts melden und verspricht es im Dialog auch nicht.
+     *
+     * @return list<Eintrag>
+     */
+    private function mealieZumAbhaken(): array
+    {
+        if ($this->banner() !== null || $this->mealieToken() === null) {
+            return [];
+        }
+
+        return app(Sitzung::class)->offene();
+    }
+
+    /**
+     * Hakt alle offenen Mealie-Artikel in einem Zug ab: erst auf dem Screen,
+     * dann — in einem einzigen Bulk-Update — in Mealie. Lehnt Mealie ab,
+     * kehren sie in ihre Gruppen zurück.
+     */
+    private function mealieAlleAbhaken(): void
+    {
+        $eintraege = $this->mealieZumAbhaken();
+        $token = $this->mealieToken();
+
+        if ($eintraege === [] || $token === null) {
+            return;
+        }
+
+        $ids = array_map(fn (Eintrag $eintrag) => $eintrag->id, $eintraege);
+        $artikel = array_map(fn (Eintrag $eintrag) => $eintrag->roh, $eintraege);
+
+        app(Sitzung::class)->hakenMehrere($ids, true);
+
+        $basisUrl = (string) config('mealie.url');
+        $timeout = (int) config('mealie.timeout');
+
+        $this->async(static fn (): array => Artikelstatus::alleSetzen($basisUrl, $token, $timeout, $artikel, true))
+            ->timeout($timeout + 5)
+            ->finished(function (array $ergebnis) use ($ids): void {
+                if ($ergebnis['ok'] ?? false) {
+                    return;
+                }
+
+                $this->mealieAbhakenZuruecknehmen($ids);
+            })
+            ->failed(function () use ($ids): void {
+                $this->mealieAbhakenZuruecknehmen($ids);
+            });
+    }
+
+    /**
+     * Mealie hat das Bulk-Update nicht angenommen: die Artikel kehren in ihre
+     * Gruppen zurück. Die eigenen Artikel bleiben entfernt — die hat Mealie
+     * nie etwas angegangen.
+     *
+     * @param  list<string>  $ids
+     */
+    private function mealieAbhakenZuruecknehmen(array $ids): void
+    {
+        app(Sitzung::class)->hakenMehrere($ids, false);
+
+        $this->listeNeuZeichnen();
+
+        Dialog::toast('Mealie: Abhaken fehlgeschlagen');
     }
 
     public function oeffneEinstellungen(): void

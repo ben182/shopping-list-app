@@ -161,16 +161,17 @@ Prefix: `EKL`.
 - [x] Löschen des Tokens in den Einstellungen löscht auch den Mealie-Cache; der Einkaufen-Screen zeigt danach nur eigene Artikel und die Hinweiszeile „Mealie nicht verbunden“.
 
 ### EKL-010: „Alles abhaken“ inklusive Mealie-Artikel
+**Status:** done
 **Priority:** 10
 **Blocked by:** EKL-005, EKL-008
 **Description:** Als Nutzer möchte ich nach dem Einkauf mit „Alles abhaken“ auch alle offenen Mealie-Artikel abhaken, damit ich nicht zwei Handgriffe brauche.
 
 **Acceptance Criteria:**
-- [ ] Der Dialog „Alles abhaken?“ nennt beide Zahlen, jede nur wenn größer 0, jeweils als eigener Satz: „n eigene Artikel wandern zurück in den Vorrat.“ (Singular: „1 eigener Artikel wandert zurück in den Vorrat.“) und „m Mealie-Artikel werden abgehakt.“ (Singular: „1 Mealie-Artikel wird abgehakt.“).
-- [ ] „Abhaken“ entfernt alle eigenen Artikel von der Liste und sendet für alle offenen Mealie-Artikel ein Abhaken an Mealie (Bulk-Update über `PUT /api/households/shopping/items` mit einem Array aller Artikel, `checked: true`). Die Mealie-Artikel wandern in den Abschnitt „Abgehakt“.
-- [ ] Schlägt der Mealie-Aufruf fehl, bleiben die eigenen Artikel entfernt, die Mealie-Artikel kehren in ihre Gruppen zurück und ein Toast „Mealie: Abhaken fehlgeschlagen“ erscheint.
-- [ ] Ist Mealie im Fehlerzustand (Banner aus EKL-009 sichtbar) oder kein Token hinterlegt, nennt der Dialog nur die eigenen Artikel und hakt nur diese ab.
-- [ ] Die Action „Alles abhaken“ ist sichtbar, sobald mindestens ein eigener oder offener Mealie-Artikel vorhanden ist.
+- [x] Der Dialog „Alles abhaken?“ nennt beide Zahlen, jede nur wenn größer 0, jeweils als eigener Satz: „n eigene Artikel wandern zurück in den Vorrat.“ (Singular: „1 eigener Artikel wandert zurück in den Vorrat.“) und „m Mealie-Artikel werden abgehakt.“ (Singular: „1 Mealie-Artikel wird abgehakt.“).
+- [x] „Abhaken“ entfernt alle eigenen Artikel von der Liste und sendet für alle offenen Mealie-Artikel ein Abhaken an Mealie (Bulk-Update über `PUT /api/households/shopping/items` mit einem Array aller Artikel, `checked: true`). Die Mealie-Artikel wandern in den Abschnitt „Abgehakt“.
+- [x] Schlägt der Mealie-Aufruf fehl, bleiben die eigenen Artikel entfernt, die Mealie-Artikel kehren in ihre Gruppen zurück und ein Toast „Mealie: Abhaken fehlgeschlagen“ erscheint.
+- [x] Ist Mealie im Fehlerzustand (Banner aus EKL-009 sichtbar) oder kein Token hinterlegt, nennt der Dialog nur die eigenen Artikel und hakt nur diese ab.
+- [x] Die Action „Alles abhaken“ ist sichtbar, sobald mindestens ein eigener oder offener Mealie-Artikel vorhanden ist.
 
 ### EKL-011: Wochenplan anzeigen
 **Priority:** 11

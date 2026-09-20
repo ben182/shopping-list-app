@@ -90,6 +90,25 @@ final class Sitzung
         $this->cache->aktualisieren($this->daten());
     }
 
+    /**
+     * Legt den Haken mehrerer Artikel in einem Zug um — „Alles abhaken“ und
+     * seine Rücknahme. Ein Durchlauf statt einer Schleife über `haken()`:
+     * der Cache wird dabei einmal geschrieben, nicht je Artikel.
+     *
+     * @param  list<string>  $ids
+     */
+    public function hakenMehrere(array $ids, bool $abgehakt): void
+    {
+        $betroffen = array_flip($ids);
+
+        $this->eintraege = array_map(
+            fn (Eintrag $eintrag) => isset($betroffen[$eintrag->id]) ? $eintrag->mitHaken($abgehakt) : $eintrag,
+            $this->alle(),
+        );
+
+        $this->cache->aktualisieren($this->daten());
+    }
+
     public function abgehakteAufgeklappt(): bool
     {
         return $this->abgehakteAufgeklappt;

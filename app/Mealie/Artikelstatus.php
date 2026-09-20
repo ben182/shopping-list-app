@@ -37,4 +37,33 @@ final class Artikelstatus
 
         return ['ok' => $antwort->successful()];
     }
+
+    /**
+     * Dasselbe für viele Artikel auf einmal: Mealie nimmt unter derselben
+     * Route ohne Artikel-ID ein Array entgegen und aktualisiert alle in
+     * einem Zug — ein Aufruf statt einem je Artikel.
+     *
+     * @param  list<array<string, mixed>>  $artikel  Mealies Darstellung der Artikel
+     * @return array{ok: bool}
+     */
+    public static function alleSetzen(string $basisUrl, string $token, int $timeout, array $artikel, bool $abgehakt): array
+    {
+        if ($artikel === []) {
+            return ['ok' => true];
+        }
+
+        try {
+            $antwort = Http::withToken($token)
+                ->timeout($timeout)
+                ->acceptJson()
+                ->put(
+                    rtrim($basisUrl, '/').'/api/households/shopping/items',
+                    array_map(fn (array $eintrag) => [...$eintrag, 'checked' => $abgehakt], $artikel),
+                );
+        } catch (ConnectionException) {
+            return ['ok' => false];
+        }
+
+        return ['ok' => $antwort->successful()];
+    }
 }

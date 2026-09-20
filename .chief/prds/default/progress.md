@@ -54,6 +54,10 @@
   gibt es dort nicht. Den Namen in der Komponente auswählen
   (`IconResolver::resolve(null, Ios::X, Android::Y)['icon'] ?? Android::Y->value`)
   und per `$this->view('name', [...])` ins Blade reichen.
+- **Bulk gegen Einzeln in `Http::fake()`:** `…/items/*` und `…/items` sind
+  zwei getrennte Muster — das abschließende `*` darf leer sein, der `/`
+  davor nicht fehlen. Wer eine Route vergisst, schickt eine echte Anfrage
+  ins Netz.
 - **`native:outlined-text-input`:** `@change="handler"` → `public function
   handler(string $eingabe)`. `sync-mode="debounce"` + `debounce-ms="…"` steuern,
   wann getippter Text ankommt; `value="{{ $prop }}"` spiegelt den Zustand zurück.
@@ -838,3 +842,67 @@ Produktentscheidung, keine technische.
   „Alles abhaken?" braucht, um die Mealie-Zahl wegzulassen.
 ---
 <!-- chief-timing story="EKL-009" duration_ms=636217 cost=17.515263 in=146 out=404 cache_create=274516 cache_read=8223732 -->
+
+## 2026-09-20 - EKL-010
+
+„Alles abhaken“ nimmt jetzt beide Seiten mit. Der Dialog setzt sich aus
+zwei Sätzen zusammen, jeder nur, wenn seine Zahl größer 0 ist: „n eigene
+Artikel wandern zurück in den Vorrat.“ und „m Mealie-Artikel werden
+abgehakt.“, beide mit Singularform. Nach „Abhaken“ leert sich die eigene
+Liste, alle offenen Mealie-Artikel springen sofort in den Abschnitt
+„Abgehakt“ und gehen in **einem** Aufruf an Mealie —
+`PUT /api/households/shopping/items` mit einem Array aller Artikel in
+Mealies eigener Darstellung, `checked: true`. Lehnt Mealie ab oder läuft
+der Aufruf in einen Timeout, kehren nur die Mealie-Artikel in ihre
+Gruppen zurück (die eigenen bleiben entfernt — die gingen Mealie nie
+etwas an) und ein Toast „Mealie: Abhaken fehlgeschlagen“ erscheint.
+Steht das Banner aus EKL-009 oder fehlt das Token, zählt der Dialog nur
+die eigenen Artikel und rührt Mealie nicht an. Die Action erscheint
+jetzt bei `Uebersicht::anzahl() > 0`, also auch, wenn nur ein
+Mealie-Artikel offen ist.
+
+**Dateien**
+
+- `app/Mealie/Artikelstatus.php` — `alleSetzen()` (Bulk-PUT ohne Artikel-ID
+  in der URL, Array als Body)
+- `app/Mealie/Sitzung.php` — `hakenMehrere(array $ids, bool $abgehakt)`,
+  ein Cache-Schreibvorgang statt einem je Artikel
+- `app/NativeComponents/Einkaufen.php` — `alleAbhakenFrage()`,
+  `mealieZumAbhaken()`, `mealieAlleAbhaken()`,
+  `mealieAbhakenZuruecknehmen()`; `navigationOptions()` fragt die
+  Übersicht statt der eigenen Liste
+- `tests/Feature/EinkaufenMealieTest.php` — 11 neue Tests, `mitMealie()`
+  fakt zusätzlich die Bulk-Route
+- `tests/Feature/EinkaufenTest.php` — zwei Dialogtexte auf die neue
+  Formulierung gezogen
+
+149 Tests, 983 Assertions, grün. Pint sauber. `native:validate` rot mit
+denselben 11 „Unknown native element type“-Meldungen wie zuvor, keine
+andere Fehlerart.
+
+**Learnings für die nächsten Iterationen**
+
+- **`Http::fake()`-Muster mit und ohne Schrägstrich sind zwei Muster:**
+  `*/api/households/shopping/items/*` trifft die Bulk-Route
+  `…/items` **nicht** (das `*` am Ende darf leer sein, der `/` davor nicht
+  fehlen). Was nicht gefakt ist, geht wirklich ins Netz — `mitMealie()`
+  fakt deshalb beide Muster. Sie überschneiden sich nicht.
+- **Der Rücknahmeweg braucht die IDs, nicht die Einträge.** Beim Bulk
+  merkt sich der Screen `array_map(fn (Eintrag $e) => $e->id, …)` vor dem
+  optimistischen Haken; der `finished`/`failed`-Handler hakt genau diese
+  Liste wieder auf. Alles neu aus der Sitzung zu lesen wäre falsch — bis
+  die Antwort da ist, kann der Nutzer weitergetippt haben.
+- **Dialogtexte aus mehreren Sätzen** baut man als `$saetze[]`-Array und
+  `implode(' ', …)`, nicht mit verschachtelten Ternaries: die Regel
+  „jeder Satz nur, wenn seine Zahl > 0“ bleibt so lesbar und ist genau
+  das, was die Akzeptanz beschreibt.
+- **„Ist Mealie ansprechbar?“ ist eine Frage, zwei Bedingungen:**
+  `banner() !== null || mealieToken() === null`. Sie steckt in
+  `mealieZumAbhaken()` und gibt bei Nein ein leeres Array zurück — Dialog
+  und Ausführung fragen dieselbe Methode, deshalb können Text und Tat
+  nicht auseinanderlaufen.
+- Für EKL-011/012: `Uebersicht::anzahl()` ist die Zahl, an der die
+  Sichtbarkeit von Screen-Actions hängt (eigene + offene Mealie),
+  `EigeneListe::anzahl()` nur noch die halbe Wahrheit.
+---
+<!-- chief-timing story="EKL-010" duration_ms=232285 cost=7.312694 in=72 out=266 cache_create=173663 cache_read=2690322 -->

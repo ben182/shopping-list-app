@@ -135,7 +135,7 @@ it('fragt vor dem Abhaken mit einem nativen Dialog nach', function () {
     Native::visit('/')
         ->press('alleAbhakenBestaetigen')
         ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['title'] === 'Alles abhaken?'
-            && $params['message'] === '3 Artikel wandern zurück in den Vorrat.'
+            && $params['message'] === '3 eigene Artikel wandern zurück in den Vorrat.'
             && collect($params['buttons'])->map(fn ($button) => is_array($button) ? $button['label'] : $button)->all() === ['Abbrechen', 'Abhaken']);
 });
 
@@ -144,7 +144,7 @@ it('zählt im Dialogtext den einen Artikel im Singular', function () {
 
     Native::visit('/')
         ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message'] === '1 Artikel wandert zurück in den Vorrat.');
+        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message'] === '1 eigener Artikel wandert zurück in den Vorrat.');
 });
 
 it('schickt nach „Abhaken“ alle Artikel zurück in den Vorrat', function () {
