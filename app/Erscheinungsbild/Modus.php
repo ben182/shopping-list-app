@@ -2,6 +2,8 @@
 
 namespace App\Erscheinungsbild;
 
+use Ben182\Appearance\AppearanceStyle;
+
 /**
  * Wonach sich die App beim Hell/Dunkel-Modus richtet. Die Reihenfolge der
  * Fälle ist die Reihenfolge im Segmented Control — der Index einer Option
@@ -31,6 +33,18 @@ enum Modus: string
     public static function beschriftungen(): array
     {
         return array_map(fn (self $modus) => $modus->beschriftung(), self::cases());
+    }
+
+    /**
+     * Der Stil, den das Plugin ans Gerät schiebt.
+     */
+    public function stil(): AppearanceStyle
+    {
+        return match ($this) {
+            self::System => AppearanceStyle::System,
+            self::Hell => AppearanceStyle::Light,
+            self::Dunkel => AppearanceStyle::Dark,
+        };
     }
 
     /**

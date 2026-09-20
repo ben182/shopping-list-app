@@ -9,12 +9,11 @@ use App\Mealie\Token;
 use App\Mealie\Verbindung;
 use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Native\Mobile\Edge\Element;
-use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Facades\Dialog;
 use Native\Mobile\SecureStorageStatus;
 
-class Einstellungen extends NativeComponent
+class Einstellungen extends Screen
 {
     /** Was im Token-Feld steht. Nach dem Speichern wieder leer. */
     public string $eingabe = '';

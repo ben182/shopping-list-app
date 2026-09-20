@@ -3,6 +3,7 @@
 use App\Erscheinungsbild\Auswahl;
 use App\Erscheinungsbild\Modus;
 use App\Models\Einstellung;
+use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Testing\Native;
 
 /*
@@ -104,3 +105,80 @@ it('bleibt mit dem neuen Abschnitt für den Screenreader bedienbar', function ()
 
     Native::visit('/einstellungen')->assertAccessible();
 });
+
+/*
+ * Ab hier: die Wirkung der Wahl. Der Seam bleibt der Wire-Tree bzw. die
+ * Fake-Bridge — geprüft wird, was das Gerät zu sehen bekäme.
+ */
+
+it('schiebt „Dunkel“ sofort ans Gerät', function () {
+    fakeSecureStore();
+
+    Native::visit('/einstellungen')
+        ->changeTab('erscheinungsbild', 2)
+        ->assertNativeCalled('Appearance.Set', fn (array $params) => $params['mode'] === 'dark');
+});
+
+it('schiebt „Hell“ sofort ans Gerät', function () {
+    fakeSecureStore();
+
+    Native::visit('/einstellungen')
+        ->changeTab('erscheinungsbild', 1)
+        ->assertNativeCalled('Appearance.Set', fn (array $params) => $params['mode'] === 'light');
+});
+
+it('gibt die App mit „System“ wieder dem Systemthema zurück', function () {
+    fakeSecureStore();
+
+    Native::visit('/einstellungen')
+        ->changeTab('erscheinungsbild', 2)
+        ->changeTab('erscheinungsbild', 0)
+        ->assertNativeCalled('Appearance.Set', fn (array $params) => $params['mode'] === 'system');
+});
+
+it('wendet den gespeicherten Modus beim App-Start an', function () {
+    fakeSecureStore();
+
+    Einstellung::query()->create(['schluessel' => 'erscheinungsbild', 'wert' => 'dunkel']);
+
+    // Der Start landet auf dem ersten Tab — noch bevor jemand die
+    // Einstellungen öffnet, muss die App dunkel sein.
+    Native::visit('/')
+        ->assertNativeCalled('Appearance.Set', fn (array $params) => $params['mode'] === 'dark');
+});
+
+it('wendet den gespeicherten Modus bei der Rückkehr in den Vordergrund erneut an', function () {
+    fakeSecureStore();
+
+    Einstellung::query()->create(['schluessel' => 'erscheinungsbild', 'wert' => 'hell']);
+
+    Native::visit('/vorrat')
+        ->assertNativeCalledTimes('Appearance.Set', 1)
+        ->emitNative(AppForegrounded::class)
+        ->assertNativeCalledTimes('Appearance.Set', 2);
+});
+
+it('speichert die Wahl auch dann, wenn es die native Hälfte auf der Plattform nicht gibt', function () {
+    fakeSecureStore()->withoutCapability('Appearance.Set');
+
+    $screen = Native::visit('/einstellungen')
+        ->changeTab('erscheinungsbild', 2)
+        ->assertNativeNotCalled('Appearance.Set');
+
+    expect(knotenMitRef($screen, 'erscheinungsbild')['props']['value'])->toBe(2)
+        ->and(app(Auswahl::class)->aktuell())->toBe(Modus::Dunkel);
+});
+
+it('wendet den Modus auf jedem Screen an, nicht nur auf dem Startbildschirm', function (string $route) {
+    fakeSecureStore();
+
+    Einstellung::query()->create(['schluessel' => 'erscheinungsbild', 'wert' => 'dunkel']);
+
+    Native::visit($route)
+        ->assertNativeCalled('Appearance.Set', fn (array $params) => $params['mode'] === 'dark');
+})->with([
+    'Einkaufen' => '/',
+    'Vorrat' => '/vorrat',
+    'Wochenplan' => '/wochenplan',
+    'Einstellungen' => '/einstellungen',
+]);

@@ -15,18 +15,15 @@ use App\Mealie\Fehler;
 use App\Mealie\Fehlerzustand;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
-use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Attributes\Computed;
-use Native\Mobile\Attributes\On;
 use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\Layouts\Builders\NavAction;
 use Native\Mobile\Edge\Layouts\Builders\NavBarOptions;
-use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Facades\Dialog;
 use Native\Mobile\SecureStorageStatus;
 
-class Einkaufen extends NativeComponent
+class Einkaufen extends Screen
 {
     /**
      * Läuft gerade der erste Mealie-Ladevorgang dieser Sitzung? Nur der
@@ -86,13 +83,8 @@ class Einkaufen extends NativeComponent
         $this->mealieLaden();
     }
 
-    /**
-     * Die App kommt aus dem Hintergrund zurück — das Ereignis schickt das
-     * Plugin `ben182/app-lifecycle`. Der Screen tut dann dasselbe wie beim
-     * Öffnen des Tabs.
-     */
-    #[On(AppForegrounded::class)]
-    public function appImVordergrund(): void
+    /** Zurück aus dem Hintergrund — dasselbe wie beim Öffnen des Tabs. */
+    protected function wiederImVordergrund(): void
     {
         $this->mealieLaden();
     }

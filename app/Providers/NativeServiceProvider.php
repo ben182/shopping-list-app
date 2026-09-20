@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Ben182\Appearance\AppearanceServiceProvider;
 use Ben182\AppLifecycle\AppLifecycleServiceProvider;
 use Ben182\SecureStorage\SecureStorageServiceProvider;
 use Illuminate\Support\ServiceProvider;
@@ -41,6 +42,7 @@ class NativeServiceProvider extends ServiceProvider
             NativeUIServiceProvider::class,
             SecureStorageServiceProvider::class,
             AppLifecycleServiceProvider::class,
+            AppearanceServiceProvider::class,
             BrowserServiceProvider::class,
         ];
     }

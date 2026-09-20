@@ -9,10 +9,9 @@ use App\Katalog\Katalog;
 use App\Liste\EigeneListe;
 use Native\Mobile\Attributes\Computed;
 use Native\Mobile\Edge\Element;
-use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Icon\IconResolver;
 
-class Vorrat extends NativeComponent
+class Vorrat extends Screen
 {
     /**
      * Der Suchtext, wie er im Feld steht — ungetrimmt, damit der Löschen-Button

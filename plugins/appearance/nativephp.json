@@ -1,0 +1,27 @@
+{
+    "namespace": "Appearance",
+    "bridge_functions": [
+        {
+            "name": "Appearance.Set",
+            "android": "de.ben182.appearance.AppearanceFunctions.Set",
+            "ios": "AppearanceFunctions.Set",
+            "description": "Pin the app to light or dark, or hand it back to the system"
+        }
+    ],
+    "android": {
+        "min_version": 31,
+        "permissions": [],
+        "dependencies": {
+            "implementation": []
+        }
+    },
+    "ios": {
+        "min_version": "18.0",
+        "info_plist": {},
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+    "events": []
+}

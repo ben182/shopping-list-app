@@ -10,15 +10,12 @@ use App\Wochenplan\Sitzung;
 use App\Wochenplan\Tag;
 use App\Wochenplan\Uebersicht;
 use App\Wochenplan\Woche;
-use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Attributes\Computed;
-use Native\Mobile\Attributes\On;
 use Native\Mobile\Edge\Element;
-use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Facades\Browser;
 use Native\Mobile\SecureStorageStatus;
 
-class Wochenplan extends NativeComponent
+class Wochenplan extends Screen
 {
     /**
      * Der Montag der gewählten Woche als `Y-m-d`. Ein String statt eines
@@ -54,12 +51,8 @@ class Wochenplan extends NativeComponent
         $this->laden();
     }
 
-    /**
-     * Die App kommt aus dem Hintergrund zurück; das Ereignis schickt das
-     * Plugin `ben182/app-lifecycle`.
-     */
-    #[On(AppForegrounded::class)]
-    public function appImVordergrund(): void
+    /** Zurück aus dem Hintergrund; das Ereignis schickt `ben182/app-lifecycle`. */
+    protected function wiederImVordergrund(): void
     {
         $this->laden();
     }

@@ -28,6 +28,17 @@
   `phpunit.xml`, deshalb die Suite mit
   `env -u MEALIE_URL -u MEALIE_SHOPPING_LIST_ID php artisan test` starten —
   sonst zeigen die Tests auf die echte Mealie-Instanz.
+- **Native Fähigkeiten kommen aus lokalen Plugins unter `plugins/`.** Muster:
+  `nativephp.json` (Bridge-Funktionen, Init-Funktion), `src/` mit
+  Service Provider plus Bridge-Klasse und Facade, `resources/android/*.kt`
+  und `resources/ios/*.swift`. Einhängen über `composer require … @dev` und
+  `NativeServiceProvider::plugins()` — ohne den zweiten Schritt wird nichts
+  in den nativen Build kompiliert. Bestehende Plugins tragen englische
+  Bezeichner, der Rest der App deutsche.
+- **Alle Screens erben von `App\NativeComponents\Screen`.** Dort hängt, was
+  jeden Screen angeht (heute: das Erscheinungsbild anwenden). Wer beim
+  Zurückkommen aus dem Hintergrund etwas nachladen will, überschreibt
+  `wiederImVordergrund()`, nicht den `#[On]`-Handler.
 - **`vendor/bin/pint --dirty`** vor jedem Commit.
 
 ---
@@ -90,3 +101,75 @@ Option gilt sofort, die Wahl landet in der neuen SQLite-Tabelle
 
 ---
 <!-- chief-timing story="FEIN-001" duration_ms=396382 cost=19.054897 in=192 out=794 cache_create=344797 cache_read=8351682 -->
+
+## 2026-09-20 - FEIN-002 - Gewählter Modus wirkt auf die ganze App
+
+Die Wahl aus FEIN-001 wird jetzt auch wirksam. Dafür gibt es ein drittes
+lokales Plugin, `ben182/appearance`, mit einer Bridge-Funktion
+`Appearance.Set` (`mode`: `system` | `light` | `dark`). Angewandt wird sie an
+drei Stellen: beim Tippen auf eine Option, beim Entstehen jedes Screens
+(also beim App-Start und bei jeder Navigation) und bei der Rückkehr der App
+in den Vordergrund.
+
+**Geänderte Dateien**
+
+- `plugins/appearance/` (neu) — `composer.json`, `nativephp.json`,
+  `src/Appearance.php`, `src/AppearanceStyle.php`, `src/Facades/Appearance.php`,
+  `src/AppearanceServiceProvider.php`,
+  `resources/android/AppearanceFunctions.kt`,
+  `resources/ios/AppearanceFunctions.swift`
+- `composer.json` / `composer.lock` — `ben182/appearance: @dev`
+- `app/Providers/NativeServiceProvider.php` — Plugin in die Allow-List
+- `app/Erscheinungsbild/Modus.php` — `stil(): AppearanceStyle`
+- `app/Erscheinungsbild/Auswahl.php` — `anwenden()`, von `waehlen()` mitgerufen
+- `app/NativeComponents/Screen.php` (neu) — gemeinsamer Unterbau aller Screens
+- `app/NativeComponents/{Einkaufen,Vorrat,Wochenplan,Einstellungen}.php` —
+  erben von `Screen`; die beiden `#[On(AppForegrounded)]`-Handler heißen
+  jetzt `wiederImVordergrund()`
+- `tests/Feature/ErscheinungsbildTest.php` — 10 weitere Tests (jetzt 20)
+
+**Auf dem Emulator verifiziert** (Pixel_7_API_35): Screens, Tab-Leiste,
+Status-/Navigationsleiste und der native „Token löschen?"-Dialog folgen der
+Wahl gegen das Systemthema; „System" gibt die App zurück und übernimmt einen
+Live-Wechsel des Systemthemas; nach `force-stop` startet sie im gewählten
+Modus.
+
+**Learnings for future iterations:**
+
+- **Der Hebel auf Android ist `UiModeManager.setApplicationNightMode()`**
+  (API 31, App-minSdk ist 33), nicht `AppCompatDelegate`: die MainActivity ist
+  eine `FragmentActivity` ohne AppCompat. `MODE_NIGHT_AUTO` heißt dort nicht
+  „nach Uhrzeit", sondern räumt die Überschreibung ab — das ist „System".
+  Weil die Activity `configChanges="uiMode"` trägt, wird sie nicht neu
+  erzeugt: Compose liest `isSystemInDarkTheme()` neu und NativePHPs
+  `configureStatusBar()` färbt die Systemleisten um. Beides ohne eine Zeile
+  PHP.
+- **`Native\Mobile\UI\Theme::merge()` war der falsche Weg** (so stand es noch
+  in FEIN-001): Tokens färben nur, was die App selbst zeichnet — native
+  Dialoge und Systemleisten bleiben davon unberührt.
+- **Ein Screen kann pro Ereignis nur einen `#[On]`-Handler haben.**
+  `$nativeEventListeners` ist eine Map Ereignis → *ein* Methodenname, und eine
+  überschreibende Kindmethode verdrängt die der Basisklasse. Deshalb ist
+  `Screen::appImVordergrund()` `final` und ruft den Hook
+  `wiederImVordergrund()`; wer den Handler selbst überschreibt, verliert
+  lautlos, was die Basisklasse dort tut.
+- **`mountComponent()` ist `final`** — ein „läuft beim Öffnen jedes Screens"-
+  Hook geht nur über den Konstruktor der Basisklasse. Der greift auch im
+  Test: `TestableComponent` aktiviert die FakeBridge, *bevor* es die
+  Komponente baut, `Native::visit()` sieht den Aufruf also.
+- **`withoutCapability('X.Y')` an der FakeBridge** ist der Seam für „das
+  Plugin gibt es auf dieser Plattform nicht": `nativephp_can()` sagt dann
+  nein, und der Test prüft, dass die App das aushält.
+- **Ein neues Plugin braucht vier Handgriffe**: Verzeichnis unter `plugins/`,
+  `composer require ben182/<name> @dev` (Path-Repository `plugins/*` steht
+  schon), Eintrag in `NativeServiceProvider::plugins()` — sonst landet es
+  nicht im nativen Build — und `php artisan package:discover`. Kontrolle:
+  `nativephp/android/app/src/nativephp/kotlin/.../PluginBridgeFunctionRegistration.kt`
+  nach dem Build.
+- **Geräte-Verifikation per adb ist billig**: `adb shell cmd uimode night
+  yes|no` schaltet das Systemthema, `adb shell input tap X Y` bedient die App,
+  `adb exec-out screencap -p > /tmp/x.png` liefert das Bild zum Ansehen. Die
+  Koordinaten aus einem Screenshot müssen mit dem Skalierungsfaktor
+  zurückgerechnet werden.
+---
+<!-- chief-timing story="FEIN-002" duration_ms=947178 cost=37.500810 in=320 out=1395 cache_create=538906 cache_read=18191265 -->

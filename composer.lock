@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3ab18c2a13edc270dd3ff742e9797819",
+    "content-hash": "05010a71493c06f93805a492c4cf64ce",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -63,7 +63,7 @@
         },
         {
             "name": "ben182/app-lifecycle",
-            "version": "dev-chief/default",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "plugins/app-lifecycle",
@@ -99,8 +99,45 @@
             }
         },
         {
+            "name": "ben182/appearance",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "plugins/appearance",
+                "reference": "332109b48a7d3255072663a2c1fd34aff1564805"
+            },
+            "require": {
+                "nativephp/mobile": "^4.0",
+                "php": "^8.3"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Ben182\\Appearance\\AppearanceServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ben182\\Appearance\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Pins a NativePHP Mobile app to light or dark, independently of the system setting",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "ben182/secure-storage",
-            "version": "dev-chief/default",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "plugins/secure-storage",
@@ -10428,6 +10465,7 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "ben182/app-lifecycle": 20,
+        "ben182/appearance": 20,
         "ben182/secure-storage": 20
     },
     "prefer-stable": true,

@@ -34,17 +34,18 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Der bestehende Theme-Test (jede gesendete Farbe hat eine abweichende Dunkel-Entsprechung) gilt auch für die Einstellungen-Seite mit dem neuen Abschnitt.
 
 ### FEIN-002: Gewählter Modus wirkt auf die ganze App
+**Status:** done
 **Priority:** 2
 **Blocked by:** FEIN-001
 **Description:** Als Nutzer möchte ich, dass „Hell" oder „Dunkel" die komplette App umstellt, inklusive Tab-Leiste, Navigationsleiste und Systemdialogen, damit nichts halb hell und halb dunkel aussieht.
 
 **Acceptance Criteria:**
-- [ ] Wähle ich „Dunkel", stellt sich die App unmittelbar auf die dunkle Palette um, auch wenn das System auf Hell steht. Das gilt für alle Screens, die Tab-Leiste, die Navigationsleiste und die nativen Bestätigungsdialoge (z. B. „Token löschen?").
-- [ ] Wähle ich „Hell", gilt dasselbe umgekehrt.
-- [ ] Wähle ich „System", folgt die App wieder dem Systemthema, und ein Wechsel des Systemthemas bei laufender App wird übernommen.
-- [ ] Der gespeicherte Modus wird beim App-Start und bei jeder Rückkehr in den Vordergrund erneut angewendet, sodass die App nie im falschen Modus startet.
-- [ ] Die Umsetzung erfolgt als eigenes lokales natives Plugin nach dem Muster der beiden vorhandenen Plugins (Secure Storage, App-Lifecycle) mit Android- und iOS-Hälfte; der PHP-Teil ist gegen die Fake-Bridge getestet. Nur Android muss in dieser PRD auf dem Gerät verifiziert werden.
-- [ ] Ist das Plugin auf der Plattform nicht verfügbar (z. B. im Test), bleibt die Einstellung trotzdem gespeichert und die App läuft ohne Fehler weiter.
+- [x] Wähle ich „Dunkel", stellt sich die App unmittelbar auf die dunkle Palette um, auch wenn das System auf Hell steht. Das gilt für alle Screens, die Tab-Leiste, die Navigationsleiste und die nativen Bestätigungsdialoge (z. B. „Token löschen?").
+- [x] Wähle ich „Hell", gilt dasselbe umgekehrt.
+- [x] Wähle ich „System", folgt die App wieder dem Systemthema, und ein Wechsel des Systemthemas bei laufender App wird übernommen.
+- [x] Der gespeicherte Modus wird beim App-Start und bei jeder Rückkehr in den Vordergrund erneut angewendet, sodass die App nie im falschen Modus startet.
+- [x] Die Umsetzung erfolgt als eigenes lokales natives Plugin nach dem Muster der beiden vorhandenen Plugins (Secure Storage, App-Lifecycle) mit Android- und iOS-Hälfte; der PHP-Teil ist gegen die Fake-Bridge getestet. Nur Android muss in dieser PRD auf dem Gerät verifiziert werden.
+- [x] Ist das Plugin auf der Plattform nicht verfügbar (z. B. im Test), bleibt die Einstellung trotzdem gespeichert und die App läuft ohne Fehler weiter.
 
 ### FEIN-003: Akzentfarbe wählen
 **Priority:** 3
