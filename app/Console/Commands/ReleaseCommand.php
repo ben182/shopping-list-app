@@ -171,6 +171,7 @@ final class ReleaseCommand extends Command
     private function testlauf(): bool
     {
         $this->components->info('Tests');
+        $this->cachesLeeren();
 
         return $this->artisan(['test'], timeout: 900)->successful();
     }
@@ -179,7 +180,22 @@ final class ReleaseCommand extends Command
     {
         $this->components->info('Build (das dauert)');
 
-        return $this->artisan(['native:package', 'android'], timeout: 3600)->successful();
+        $erfolg = $this->artisan(['native:package', 'android'], timeout: 3600)->successful();
+
+        $this->cachesLeeren();
+
+        return $erfolg;
+    }
+
+    /**
+     * `native:package` installiert die Abhängigkeiten ohne dev-Pakete neu und
+     * lässt `bootstrap/cache/packages.php` und `services.php` mit dem Paketstand
+     * des Bundles zurück. Wer danach testet, bekommt eine App ohne Testpakete
+     * und ohne native Routen zu sehen.
+     */
+    private function cachesLeeren(): void
+    {
+        $this->artisan(['optimize:clear', '--quiet'], timeout: 120);
     }
 
     /**
