@@ -2,7 +2,9 @@
 
 namespace App\NativeComponents;
 
+use App\Erscheinungsbild\Akzentfarbe;
 use App\Erscheinungsbild\Auswahl;
+use App\Erscheinungsbild\Farbwahl;
 use App\Erscheinungsbild\Modus;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
@@ -36,6 +38,9 @@ class Einstellungen extends Screen
      */
     public int $erscheinungsbild = 0;
 
+    /** Die gewählte Akzentfarbe als gespeicherter Wert, etwa `gruen`. */
+    public string $akzentfarbe = '';
+
     public function navTitle(): string
     {
         return 'Einstellungen';
@@ -44,6 +49,7 @@ class Einstellungen extends Screen
     public function mount(): void
     {
         $this->erscheinungsbild = app(Auswahl::class)->aktuell()->position();
+        $this->akzentfarbe = app(Farbwahl::class)->aktuell()->value;
 
         $this->statusLesen();
     }
@@ -67,6 +73,28 @@ class Einstellungen extends Screen
     public function erscheinungsbildOptionen(): array
     {
         return Modus::beschriftungen();
+    }
+
+    /**
+     * Ein Tipp auf einen Kreis gilt sofort — auch hier ohne Speichern-Knopf.
+     */
+    public function akzentfarbeGewaehlt(string $wert): void
+    {
+        $farbe = Akzentfarbe::ausWert($wert);
+
+        $this->akzentfarbe = $farbe->value;
+
+        app(Farbwahl::class)->waehlen($farbe);
+    }
+
+    /**
+     * Die Kreise in Anzeigereihenfolge.
+     *
+     * @return list<Akzentfarbe>
+     */
+    public function akzentfarben(): array
+    {
+        return Akzentfarbe::cases();
     }
 
     public function mealieUrl(): string

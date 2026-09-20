@@ -48,20 +48,21 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Ist das Plugin auf der Plattform nicht verfügbar (z. B. im Test), bleibt die Einstellung trotzdem gespeichert und die App läuft ohne Fehler weiter.
 
 ### FEIN-003: Akzentfarbe wählen
+**Status:** done
 **Priority:** 3
 **Blocked by:** FEIN-001
 **Description:** Als Nutzer möchte ich eine von sechs Akzentfarben wählen, damit die App meinem Geschmack entspricht.
 
 **Acceptance Criteria:**
-- [ ] Im Abschnitt „Erscheinungsbild" steht direkt unter dem Modus-Umschalter eine Reihe aus sechs farbigen Kreisen in dieser Reihenfolge: Indigo, Blau, Grün, Orange, Rosa, Violett.
-- [ ] Der aktive Kreis zeigt ein Häkchen; die anderen sind leer. Es gibt keine Textbeschriftung je Farbe.
-- [ ] Jeder Kreis trägt ein Accessibility-Label nach dem Muster „Akzentfarbe Grün" bzw. „Akzentfarbe Grün, ausgewählt".
-- [ ] Bei erster Nutzung ist Indigo ausgewählt (die heutigen Werte `#4F46E5` hell / `#818CF8` dunkel bleiben das Indigo-Preset).
-- [ ] Ein Tipp übernimmt die Farbe sofort, ohne Speichern-Knopf, und die Wahl überlebt einen Neustart.
-- [ ] Nach dem Tipp sind auf allen Screens sofort alle Elemente umgefärbt, die heute die Primärfarbe tragen: Tab-Leiste, gefüllte Buttons, Checkboxen, Banner-Knöpfe, das Datum des heutigen Tags im Wochenplan, der „Rückgängig"-Knopf aus FEIN-004.
-- [ ] Jedes Preset definiert eine eigene Hell- und eine eigene Dunkel-Primärfarbe; der bestehende Theme-Test (jede Farbe hat eine abweichende Dunkel-Entsprechung) muss für jedes der sechs Presets bestehen.
-- [ ] Für jedes Preset erreicht die Textfarbe auf der Primärfarbe (on-primary) in Hell **und** Dunkel ein Kontrastverhältnis von mindestens 4,5:1. Ist Weiß zu schwach, nutzt das Preset in diesem Modus eine dunkle Textfarbe.
-- [ ] Android-Systemdialoge (Alert-Buttons, Date-Picker) bleiben bewusst Indigo; das ist kein Fehler.
+- [x] Im Abschnitt „Erscheinungsbild" steht direkt unter dem Modus-Umschalter eine Reihe aus sechs farbigen Kreisen in dieser Reihenfolge: Indigo, Blau, Grün, Orange, Rosa, Violett.
+- [x] Der aktive Kreis zeigt ein Häkchen; die anderen sind leer. Es gibt keine Textbeschriftung je Farbe.
+- [x] Jeder Kreis trägt ein Accessibility-Label nach dem Muster „Akzentfarbe Grün" bzw. „Akzentfarbe Grün, ausgewählt".
+- [x] Bei erster Nutzung ist Indigo ausgewählt (die heutigen Werte `#4F46E5` hell / `#818CF8` dunkel bleiben das Indigo-Preset).
+- [x] Ein Tipp übernimmt die Farbe sofort, ohne Speichern-Knopf, und die Wahl überlebt einen Neustart.
+- [x] Nach dem Tipp sind auf allen Screens sofort alle Elemente umgefärbt, die heute die Primärfarbe tragen: Tab-Leiste, gefüllte Buttons, Checkboxen, Banner-Knöpfe, das Datum des heutigen Tags im Wochenplan, der „Rückgängig"-Knopf aus FEIN-004.
+- [x] Jedes Preset definiert eine eigene Hell- und eine eigene Dunkel-Primärfarbe; der bestehende Theme-Test (jede Farbe hat eine abweichende Dunkel-Entsprechung) muss für jedes der sechs Presets bestehen.
+- [x] Für jedes Preset erreicht die Textfarbe auf der Primärfarbe (on-primary) in Hell **und** Dunkel ein Kontrastverhältnis von mindestens 4,5:1. Ist Weiß zu schwach, nutzt das Preset in diesem Modus eine dunkle Textfarbe.
+- [x] Android-Systemdialoge (Alert-Buttons, Date-Picker) bleiben bewusst Indigo; das ist kein Fehler.
 
 ### FEIN-004: „Alles abhaken" mit Rückgängig statt Nachfrage
 **Priority:** 4

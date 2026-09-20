@@ -39,6 +39,15 @@
   jeden Screen angeht (heute: das Erscheinungsbild anwenden). Wer beim
   Zurückkommen aus dem Hintergrund etwas nachladen will, überschreibt
   `wiederImVordergrund()`, nicht den `#[On]`-Handler.
+- **Farben kommen aus dem Theme, nie fest in die View.** `text-theme-primary`
+  & Co. lesen bei jedem Render aus `Native\Mobile\UI\Theme`; wer sie zur
+  Laufzeit ändern will, ruft `Theme::merge()` — der Merge überlebt den
+  Prozess nicht, gehört also in den Konstruktor von `Screen`. Was nativ
+  gezeichnet wird (Systemdialoge, Date-Picker, Splash) hängt dagegen an
+  `config/nativephp.php` und folgt dem Theme nicht.
+- **Was nativ gefärbt wird, steht nicht im Wire-Tree.** Tab-Leiste, Buttons
+  und Checkboxen tragen dort keine Farbe — der Seam dafür ist
+  `Theme::get('light.primary')` nach einem `Native::visit()`.
 - **`vendor/bin/pint --dirty`** vor jedem Commit.
 
 ---
@@ -173,3 +182,77 @@ Modus.
   zurückgerechnet werden.
 ---
 <!-- chief-timing story="FEIN-002" duration_ms=947178 cost=37.500810 in=320 out=1395 cache_create=538906 cache_read=18191265 -->
+
+## 2026-09-20 - FEIN-003 - Akzentfarbe wählen
+
+Unter dem Modus-Umschalter steht jetzt eine Reihe aus sechs farbigen
+Kreisen. Ein Tipp schreibt die Wahl in die Zeile `akzentfarbe` der
+`einstellungen`-Tabelle und legt sie als Theme-Tokens (`primary`,
+`on-primary`, je hell und dunkel) über die Konfiguration — damit färbt
+sich alles um, was `text-theme-primary` / `bg-theme-primary` trägt oder
+die Primärfarbe aus dem nativen Theme-Store liest: Tab-Leiste, gefüllte
+Buttons, Checkboxen, Banner-Knöpfe, das Datum des heutigen Tags im
+Wochenplan.
+
+**Geänderte Dateien**
+
+- `app/Erscheinungsbild/Akzentfarbe.php` (neu) — Enum mit Beschriftung,
+  Hell-/Dunkel-Primärfarbe, passender Schriftfarbe, `tokens()`, `a11yLabel()`
+- `app/Erscheinungsbild/Farbwahl.php` (neu) — Lesen/Schreiben der Vorliebe,
+  `anwenden()` über `Theme::merge()`
+- `app/NativeComponents/Screen.php` — wendet die Farbe bei jedem
+  entstehenden Screen mit an
+- `app/NativeComponents/Einstellungen.php` — Prop `$akzentfarbe`, Handler
+  `akzentfarbeGewaehlt()`, `akzentfarben()`
+- `resources/views/native/einstellungen.blade.php` — Kreis-Reihe aus
+  `native:pressable`, Häkchen im aktiven Kreis
+- `config/native-ui.php` — `dark.on-primary` von `#FFFFFF` auf `#0F172A`
+- `tests/Pest.php` — Helfer `knotenMitRefPraefix()`
+- `tests/Feature/ErscheinungsbildTest.php` — 10 weitere Tests (jetzt 30)
+- `tests/Feature/ThemeTest.php` — Kontrast- und Dunkel-Entsprechungs-Test
+  je Preset (jetzt 17 Fälle)
+- `tests/Feature/WochenplanTest.php` — das heutige Datum folgt der Wahl
+
+**Learnings for future iterations:**
+
+- **Der Hebel für Farben ist `Native\Mobile\UI\Theme::merge()`** — genau
+  das, was in FEIN-002 für Hell/Dunkel der falsche Weg war. Tokens färben,
+  was die App selbst zeichnet; Android-Systemdialoge und der Date-Picker
+  hängen an `config/nativephp.php` (`color_primary` / `color_primary_night`)
+  und bleiben deshalb Indigo. Für FEIN-003 ist das so gewollt.
+- **`Theme::merge()` wirkt sofort in beide Richtungen**: Der
+  Theme-Resolver in `TailwindParser` liest bei jedem Render frisch aus
+  `Theme::get()`, und `syncConfig()` spiegelt die Tokens nach
+  `config('native-ui.theme.*')`, wo der `theme()`-Helfer nachsieht. Nativ
+  ist `NativeUITheme` ein `mutableStateOf`-Store, Compose zeichnet also
+  neu, ohne dass ein Screen neu gebaut werden muss.
+- **Der Merge überlebt den Prozess nicht** — `Theme::load()` setzt beim
+  Provider-Boot wieder die Konfiguration. Deshalb steht `anwenden()` im
+  Konstruktor von `Screen`, an derselben Stelle wie der Hell/Dunkel-Modus.
+  Im Test ist das ein Segen: jeder Test bootet frisch, der statische
+  Token-Stand leckt nicht.
+- **Tab-Leiste, Buttons und Checkboxen tragen im Wire-Tree keine Farbe** —
+  die holen sie sich nativ aus dem Theme-Store. Der prüfbare Seam für „alles
+  umgefärbt“ ist deshalb `Theme::get('light.primary')` nach dem Besuch eines
+  Screens, nicht der Baum. Nur was die App selbst einfärbt (das heutige
+  Datum im Wochenplan) steht als `props.color` drin.
+- **`Theme::pushToNative()` schweigt unter `runningUnitTests()`** — ein
+  `assertNativeCalled('NativeUI.Theme.Set')` gibt es im Test also nicht.
+- **Arbiträre Tailwind-Werte mit Dark-Variante funktionieren**:
+  `bg-[#4F46E5] dark:bg-[#818CF8]` landet als `style.bg_color` +
+  `props.dark_bg_color` und besteht damit den Theme-Test. Für Icons gehen
+  `color` / `dark-color` als Attribute.
+- **`native:pressable` ist der Knopf ohne Aussehen**: `w-10 h-10
+  rounded-full items-center justify-center` plus `a11y-label` plus
+  `@press` ergibt einen Farbkreis. Einen Auswahlzustand meldet er dem
+  Screenreader nicht von sich aus — der muss ins Label („…, ausgewählt“).
+- **`knotenMitRefPraefix()`** ist der neue Helfer für „diese Knöpfe in
+  dieser Reihenfolge“; mit Präfix `''` liefert er die vollständige Ref-Liste
+  eines Screens und damit ein Regressionsnetz wie `sichtbarerText()`.
+- **Weiß reicht auf hellen Dunkelmodus-Tönen nicht** (Indigo-400 gegen Weiß:
+  2,98:1). Alle sechs Presets tragen im Dunkelmodus `#0F172A`; die
+  WCAG-Formel steht als `kontrast()` im `ThemeTest` und rechnet unabhängig
+  von der Palette nach.
+- **Nicht auf dem Emulator verifiziert** — an der nativen Hälfte hat sich
+  nichts geändert, ein Rebuild wäre nur für den Augenschein gewesen.
+<!-- chief-timing story="FEIN-003" duration_ms=545023 cost=23.716805 in=226 out=850 cache_create=331841 cache_read=11618431 -->

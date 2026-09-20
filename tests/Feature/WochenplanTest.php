@@ -196,6 +196,23 @@ it('zeigt für jeden der sieben Tage eine Überschrift und hebt den heutigen her
         ->and($ueberschriften[0]['farbe'])->not->toBe('#4F46E5');
 });
 
+it('färbt das Datum des heutigen Tags in der gewählten Akzentfarbe', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+    mitWochenplan();
+
+    // Erst in den Einstellungen tippen, dann hierher zurück — genau der Weg,
+    // den der Nutzer nimmt.
+    Native::visit('/einstellungen')->press('akzentfarbe-orange');
+
+    $ueberschriften = array_values(array_filter(
+        wochenplanInhalt(Native::visit('/wochenplan')),
+        fn (array $z) => $z['typ'] === 'text',
+    ));
+
+    // Orange aus der PRD-Palette, nicht aus dem Enum gelesen.
+    expect($ueberschriften[2]['farbe'])->toBe('#C2410C');
+});
+
 it('fragt Mealie nach genau der gewählten Woche', function () {
     CarbonImmutable::setTestNow('2026-09-23 10:00:00');
     mitWochenplan();

@@ -276,3 +276,31 @@ function sichtbarerText(TestableComponent $screen): array
 
     return $texte;
 }
+
+/**
+ * Alle Knoten, deren `ref` mit diesem Präfix beginnt, in Render-Reihenfolge.
+ * Anders als {@see knotenMitRef()} steigt der Walk auch in Treffer hinab und
+ * sammelt alle — für „diese Knöpfe in dieser Reihenfolge“.
+ *
+ * @return list<array<string, mixed>>
+ */
+function knotenMitRefPraefix(TestableComponent $screen, string $praefix): array
+{
+    $treffer = [];
+
+    $walk = function (array $node) use (&$walk, &$treffer, $praefix): void {
+        $ref = $node['ref'] ?? null;
+
+        if (is_string($ref) && str_starts_with($ref, $praefix)) {
+            $treffer[] = $node;
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return $treffer;
+}

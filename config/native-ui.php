@@ -88,8 +88,12 @@ return [
         'dark' => [
             // Leave empty or partial to auto-derive from `light` (luminance inversion).
             // Specify any token here to override the derived value.
+
+            // White on the lighter dark-mode indigo only reaches 2.98:1, so
+            // the dark text colour goes on top instead. Every accent preset
+            // does the same — see App\Erscheinungsbild\Akzentfarbe.
             'primary' => '#818CF8',
-            'on-primary' => '#FFFFFF',
+            'on-primary' => '#0F172A',
 
             'secondary' => '#94A3B8',
             'on-secondary' => '#0F172A',

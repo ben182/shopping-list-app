@@ -1,3 +1,6 @@
+@use('App\Icons\Android')
+@use('App\Icons\Ios')
+
 <native:column class="w-full h-full bg-theme-background gap-3 px-4 pt-4">
     <native:text class="text-sm text-theme-on-surface-variant">Erscheinungsbild</native:text>
 
@@ -12,6 +15,37 @@
         :value="$this->erscheinungsbild"
         @change="erscheinungsbildGewaehlt"
     />
+
+    {{-- Sechs Kreise ohne Beschriftung: die Farbe ist die Aussage. Was sie
+         heißt und ob sie die gewählte ist, steht im `a11y-label`. Die
+         Farbwerte stehen als feste Hex-Paare in der Klasse — sie können
+         nicht aus dem Theme kommen, denn hier wird ja gerade ausgewählt,
+         was das Theme künftig hergibt. --}}
+    <native:row class="w-full items-center gap-3">
+        @foreach ($this->akzentfarben() as $farbe)
+            {{-- Der Handler-Aufruf steht in einer Variablen, weil ein Argument in
+                 Anführungszeichen direkt im Attribut den Callback-Parser von
+                 `native:validate` aus dem Tritt bringt. --}}
+            @php($waehlen = "akzentfarbeGewaehlt('{$farbe->value}')")
+            @php($gewaehlt = $farbe->value === $this->akzentfarbe)
+            <native:pressable
+                ref="akzentfarbe-{{ $farbe->value }}"
+                a11y-label="{{ $farbe->a11yLabel($gewaehlt) }}"
+                class="w-10 h-10 rounded-full items-center justify-center bg-[{{ $farbe->hell() }}] dark:bg-[{{ $farbe->dunkel() }}]"
+                @press="{{ $waehlen }}"
+            >
+                @if ($gewaehlt)
+                    <native:icon
+                        :ios="Ios::Checkmark"
+                        :android="Android::Check"
+                        :size="20"
+                        color="{{ $farbe->aufHell() }}"
+                        dark-color="{{ $farbe->aufDunkel() }}"
+                    />
+                @endif
+            </native:pressable>
+        @endforeach
+    </native:row>
 
     <native:text class="text-sm text-theme-on-surface-variant">Mealie-Server</native:text>
     <native:text class="text-base text-theme-on-surface">{{ $this->mealieUrl() }}</native:text>

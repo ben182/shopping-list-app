@@ -1,10 +1,13 @@
 <?php
 
+use App\Erscheinungsbild\Akzentfarbe;
 use App\Erscheinungsbild\Auswahl;
+use App\Erscheinungsbild\Farbwahl;
 use App\Erscheinungsbild\Modus;
 use App\Models\Einstellung;
 use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Testing\Native;
+use Native\Mobile\UI\Theme;
 
 /*
  * Der Seam ist derselbe wie beim Rest des Einstellungen-Screens: der Screen
@@ -176,6 +179,150 @@ it('wendet den Modus auf jedem Screen an, nicht nur auf dem Startbildschirm', fu
 
     Native::visit($route)
         ->assertNativeCalled('Appearance.Set', fn (array $params) => $params['mode'] === 'dark');
+})->with([
+    'Einkaufen' => '/',
+    'Vorrat' => '/vorrat',
+    'Wochenplan' => '/wochenplan',
+    'Einstellungen' => '/einstellungen',
+]);
+
+/*
+ * Ab hier: die Akzentfarbe. Derselbe Seam — die Kreise stehen im Wire-Tree
+ * des Einstellungen-Screens, ihre Wirkung im Wire-Tree der anderen Screens.
+ */
+
+it('stellt sechs Akzentkreise in der vorgegebenen Reihenfolge unter den Modus-Umschalter', function () {
+    fakeSecureStore();
+
+    $screen = Native::visit('/einstellungen');
+    $refs = array_column(knotenMitRefPraefix($screen, ''), 'ref');
+
+    expect($refs)->toBe([
+        'erscheinungsbild',
+        'akzentfarbe-indigo',
+        'akzentfarbe-blau',
+        'akzentfarbe-gruen',
+        'akzentfarbe-orange',
+        'akzentfarbe-rosa',
+        'akzentfarbe-violett',
+        'mealie-token',
+        'token-speichern',
+        'verbindung-testen',
+        'token-loeschen',
+    ]);
+});
+
+it('zeigt das Häkchen nur im ausgewählten Kreis', function () {
+    fakeSecureStore();
+
+    $kreise = knotenMitRefPraefix(Native::visit('/einstellungen'), 'akzentfarbe-');
+
+    $mitHaken = array_map(
+        fn (array $kreis) => in_array('icon', knotenTypen($kreis), strict: true),
+        $kreise,
+    );
+
+    expect($mitHaken)->toBe([true, false, false, false, false, false]);
+});
+
+it('benennt jeden Kreis für den Screenreader und sagt dazu, welcher gewählt ist', function () {
+    fakeSecureStore();
+
+    $kreise = knotenMitRefPraefix(Native::visit('/einstellungen'), 'akzentfarbe-');
+
+    expect(array_map(fn (array $kreis) => $kreis['props']['a11y_label'], $kreise))->toBe([
+        'Akzentfarbe Indigo, ausgewählt',
+        'Akzentfarbe Blau',
+        'Akzentfarbe Grün',
+        'Akzentfarbe Orange',
+        'Akzentfarbe Rosa',
+        'Akzentfarbe Violett',
+    ]);
+});
+
+it('trägt in jedem Kreis seine eigene Farbe, hell wie dunkel', function () {
+    fakeSecureStore();
+
+    $kreise = knotenMitRefPraefix(Native::visit('/einstellungen'), 'akzentfarbe-');
+
+    $farben = array_map(
+        fn (array $kreis) => [$kreis['style']['bg_color'], $kreis['props']['dark_bg_color']],
+        $kreise,
+    );
+
+    // Die Werte stehen hier als Literale, damit der Test nicht dieselbe
+    // Tabelle liest, die er prüfen soll.
+    expect($farben)->toBe([
+        ['#4F46E5', '#818CF8'],
+        ['#2563EB', '#60A5FA'],
+        ['#15803D', '#4ADE80'],
+        ['#C2410C', '#FB923C'],
+        ['#DB2777', '#F472B6'],
+        ['#7C3AED', '#A78BFA'],
+    ]);
+});
+
+it('hat bei der ersten Nutzung Indigo ausgewählt', function () {
+    fakeSecureStore();
+
+    expect(knotenMitRef(Native::visit('/einstellungen'), 'akzentfarbe-indigo')['props']['a11y_label'])
+        ->toBe('Akzentfarbe Indigo, ausgewählt');
+});
+
+it('übernimmt eine angetippte Farbe sofort, ohne Speichern-Knopf', function () {
+    fakeSecureStore();
+
+    $screen = Native::visit('/einstellungen')->press('akzentfarbe-gruen');
+
+    expect(knotenMitRef($screen, 'akzentfarbe-gruen')['props']['a11y_label'])
+        ->toBe('Akzentfarbe Grün, ausgewählt')
+        ->and(knotenMitRef($screen, 'akzentfarbe-indigo')['props']['a11y_label'])
+        ->toBe('Akzentfarbe Indigo');
+});
+
+it('zeigt die zuletzt gewählte Farbe beim nächsten Öffnen der App wieder', function () {
+    fakeSecureStore();
+
+    Native::visit('/einstellungen')->press('akzentfarbe-rosa');
+
+    // Ein zweiter Besuch mountet den Screen frisch — dasselbe, was ein
+    // Neustart täte.
+    expect(knotenMitRef(Native::visit('/einstellungen'), 'akzentfarbe-rosa')['props']['a11y_label'])
+        ->toBe('Akzentfarbe Rosa, ausgewählt');
+});
+
+it('legt die Farbe in die lokale Datenbank statt in den Secure Storage', function () {
+    fakeSecureStore();
+
+    Native::visit('/einstellungen')
+        ->press('akzentfarbe-violett')
+        ->assertNativeNotCalled('SecureStorage.Set');
+
+    expect(app(Farbwahl::class)->aktuell())->toBe(Akzentfarbe::Violett);
+});
+
+it('fällt auf Indigo zurück, wenn gespeichert steht, was die App nicht kennt', function () {
+    fakeSecureStore();
+
+    Einstellung::query()->create(['schluessel' => 'akzentfarbe', 'wert' => 'neonpink']);
+
+    expect(knotenMitRef(Native::visit('/einstellungen'), 'akzentfarbe-indigo')['props']['a11y_label'])
+        ->toBe('Akzentfarbe Indigo, ausgewählt');
+});
+
+it('schiebt die gewählte Farbe als Theme ans Gerät — dort hängen Tab-Leiste, Knöpfe und Checkboxen dran', function (string $route) {
+    fakeSecureStore();
+
+    Native::visit('/einstellungen')->press('akzentfarbe-gruen');
+
+    // Ein neuer Screen darf die Farbe nicht wieder auf die Konfiguration
+    // zurückfallen lassen.
+    Native::visit($route);
+
+    // Literale statt der Enum-Werte: sonst prüfte der Test die Tabelle
+    // gegen sich selbst.
+    expect(Theme::get('light.primary'))->toBe('#15803D')
+        ->and(Theme::get('dark.primary'))->toBe('#4ADE80');
 })->with([
     'Einkaufen' => '/',
     'Vorrat' => '/vorrat',

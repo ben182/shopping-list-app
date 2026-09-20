@@ -3,13 +3,14 @@
 namespace App\NativeComponents;
 
 use App\Erscheinungsbild\Auswahl;
+use App\Erscheinungsbild\Farbwahl;
 use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Attributes\On;
 use Native\Mobile\Edge\NativeComponent;
 
 /**
  * Gemeinsamer Unterbau aller Screens: er sorgt dafür, dass die App im
- * gewählten Erscheinungsbild dasteht.
+ * gewählten Erscheinungsbild und in der gewählten Akzentfarbe dasteht.
  *
  * Die Ansage ans Gerät überlebt den Prozess nicht zuverlässig — deshalb
  * wird sie wiederholt, sobald ein Screen entsteht (also beim App-Start und
@@ -23,6 +24,7 @@ abstract class Screen extends NativeComponent
     public function __construct()
     {
         app(Auswahl::class)->anwenden();
+        app(Farbwahl::class)->anwenden();
     }
 
     /**
