@@ -69,7 +69,9 @@ final class ReleaseCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->option('skip-tests') && ! $this->testlauf($env)) {
+        $ohneEnvDatei = array_fill_keys($env->schluessel(), false);
+
+        if (! $this->option('skip-tests') && ! $this->testlauf($ohneEnvDatei)) {
             $this->error('Die Tests sind rot — nichts veröffentlicht.');
 
             return self::FAILURE;
@@ -85,7 +87,7 @@ final class ReleaseCommand extends Command
             'NATIVEPHP_APP_VERSION_CODE' => $versionCode,
         ]);
 
-        if (! $this->option('skip-build') && ! $this->bauen()) {
+        if (! $this->option('skip-build') && ! $this->bauen($ohneEnvDatei)) {
             $env->schreiben($vorherigeWerte);
             $this->error('Der Build ist fehlgeschlagen — Version in der .env zurückgesetzt.');
 
@@ -95,6 +97,8 @@ final class ReleaseCommand extends Command
         $apk = $this->gebauteApk($version, $versionCode, $env);
 
         if ($apk === null) {
+            $env->schreiben($vorherigeWerte);
+
             return self::FAILURE;
         }
 
@@ -169,31 +173,30 @@ final class ReleaseCommand extends Command
     }
 
     /**
-     * Der Testlauf bekommt die `.env` dieses Prozesses nicht mit.
-     *
-     * Laravel legt die Werte der `.env` in `$_SERVER` ab, von dort erbt sie
-     * jeder Kindprozess als echte Umgebungsvariable — und Laravel liest
-     * `$_SERVER` vor allem anderen, auch vor den `<env>`-Einträgen der
-     * `phpunit.xml`. Die Tests liefen sonst gegen `APP_ENV=local` und die
-     * echte Mealie-Instanz statt gegen ihre eigene Konfiguration.
+     * @param  array<string, false>  $ohneEnvDatei
      */
-    private function testlauf(EnvDatei $env): bool
+    private function testlauf(array $ohneEnvDatei): bool
     {
         $this->components->info('Tests');
         $this->cachesLeeren();
 
-        $ohneEnvDatei = array_fill_keys($env->schluessel(), false);
-
         return $this->artisan(['test'], timeout: 900, umgebung: $ohneEnvDatei)->successful();
     }
 
-    private function bauen(): bool
+    /**
+     * @param  array<string, false>  $ohneEnvDatei
+     */
+    private function bauen(array $ohneEnvDatei): bool
     {
         $this->components->info('Build (das dauert)');
 
         // Ohne --no-tty hängt `native:package` seinen Gradle-Prozess an /dev/tty.
         // Als Kindprozess gibt es kein Terminal, der Build bricht dann ohne APK ab.
-        $erfolg = $this->artisan(['native:package', 'android', '--no-tty', '--no-interaction'], timeout: 3600)->successful();
+        $erfolg = $this->artisan(
+            ['native:package', 'android', '--no-tty', '--no-interaction'],
+            timeout: 3600,
+            umgebung: $ohneEnvDatei,
+        )->successful();
 
         $this->cachesLeeren();
 
@@ -380,6 +383,16 @@ final class ReleaseCommand extends Command
     }
 
     /**
+     * Ruft artisan in einem Kindprozess auf — auf Wunsch ohne die Variablen
+     * der `.env`.
+     *
+     * Laravel legt deren Werte in `$_SERVER` ab, von dort erbt sie jeder
+     * Kindprozess als echte Umgebungsvariable, und die schlägt sowohl die
+     * frisch geschriebene `.env` als auch die `<env>`-Einträge der
+     * `phpunit.xml`. Der Testlauf lief sonst gegen `APP_ENV=local` und die
+     * echte Mealie-Instanz, und der Build schrieb den Version-Code, den dieser
+     * Prozess beim Start gelesen hatte, statt den neuen.
+     *
      * @param  list<string>  $argumente
      * @param  array<string, string|false>  $umgebung
      */
