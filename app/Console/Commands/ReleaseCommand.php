@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Release\AndroidTheme;
 use App\Release\EnvDatei;
 use App\Release\Stufe;
 use App\Release\Version;
@@ -195,6 +196,8 @@ final class ReleaseCommand extends Command
     {
         $this->components->info('Build (das dauert)');
 
+        $this->androidThemeAuffrischen();
+
         // Ohne --no-tty hängt `native:package` seinen Gradle-Prozess an /dev/tty.
         // Als Kindprozess gibt es kein Terminal, der Build bricht dann ohne APK ab.
         $erfolg = $this->artisan(
@@ -206,6 +209,19 @@ final class ReleaseCommand extends Command
         $this->cachesLeeren();
 
         return $erfolg;
+    }
+
+    /**
+     * Die Theme-Dateien im gitignorierten `nativephp/`-Ordner stammen vom
+     * letzten `native:install` und kennen spätere Farbänderungen in
+     * `config/nativephp.php` nicht. Ohne diesen Schritt trüge die APK die
+     * Farben von damals.
+     */
+    private function androidThemeAuffrischen(): void
+    {
+        foreach (AndroidTheme::ausKonfiguration(base_path('nativephp/android'))->anwenden() as $datei) {
+            $this->components->info('Android-Theme aufgefrischt: '.str_replace(base_path().'/', '', $datei));
+        }
     }
 
     /**

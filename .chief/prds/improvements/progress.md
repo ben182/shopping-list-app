@@ -54,6 +54,14 @@
 - **Was nativ gefärbt wird, steht nicht im Wire-Tree.** Tab-Leiste, Buttons
   und Checkboxen tragen dort keine Farbe — der Seam dafür ist
   `Theme::get('light.primary')` nach einem `Native::visit()`.
+- **Was `native:install` ins Projekt generiert, veraltet still.** Die
+  Android-Theme-Dateien, das Icon, der Splash und die App-ID entstehen aus
+  `config/nativephp.php` und landen im gitignorierten `nativephp/`-Ordner;
+  Gradle liest danach nur noch diesen Ordner. Wer eine solche Config ändert,
+  muss den Release-Ablauf nachziehen lassen (`App\Release\AndroidTheme`) —
+  ein erneutes `native:install` taugt im Build nicht, es fragt interaktiv nach
+  der Bundle-ID und löscht ohne `--no-force` das ganze Verzeichnis.
+
 - **Tailwind-Maße stehen in `node['layout']`, Farben in `node['style']`.**
   `h-14` → `layout.height === 56.0` (float!), Skala in
   `TailwindParser::SPACING`. Ein Knoten ohne Farbklasse hat gar keinen
@@ -563,3 +571,66 @@ Verzeichnis rendern kann.
   stillschweigend übersprungen.
 ---
 <!-- chief-timing story="FEIN-007" duration_ms=1232291 cost=53.598769 in=430 out=1352 cache_create=766445 cache_read=26080050 -->
+
+## 2026-09-20 18:05 — FEIN-008: Framework-Reste entfernen
+
+Aufgeräumt und den Release-Ablauf um das Android-Theme ergänzt.
+
+**Entfernt:** `app/Models/User.php`, `database/factories/UserFactory.php`,
+`database/seeders/DatabaseSeeder.php` (samt beider Verzeichnisse und beider
+PSR-4-Einträge `Database\Factories\`/`Database\Seeders\` in `composer.json`),
+`config/auth.php`, `config/mail.php`, `URL::forceHttps()` (und damit die ganze
+`boot()`-Methode) im `AppServiceProvider`, die drei Framework-Migrationen
+(`users`/`password_reset_tokens`/`sessions`, `cache`/`cache_locks`,
+`jobs`/`job_batches`/`failed_jobs`).
+
+**`.env` und `.env.example`:** `SESSION_DRIVER=array`, `CACHE_STORE=file`,
+`QUEUE_CONNECTION=sync` mit einer erklärenden Kommentarzeile; gestrichen sind
+`BCRYPT_ROUNDS`, `MAIL_MAILER`, `APP_FAKER_LOCALE`, `SESSION_ENCRYPT`,
+`SESSION_PATH`, `SESSION_DOMAIN`, `SESSION_LIFETIME`,
+`APP_MAINTENANCE_DRIVER`, `FILESYSTEM_DISK`, `BROADCAST_CONNECTION`.
+
+**Neu:** `app/Release/AndroidTheme.php` — trägt die Farben aus
+`config('nativephp.android.theme')` in `values/themes.xml` und
+`values-night/themes.xml` ein. `ReleaseCommand::bauen()` ruft das vor
+`native:package` auf und nennt die aufgefrischten Dateien.
+
+**Dateien:** die oben genannten plus `app/Console/Commands/ReleaseCommand.php`,
+`tests/Unit/ReleaseTest.php` (vier neue Fälle).
+
+**Learnings for future iterations:**
+
+- **`config/auth.php` und `config/mail.php` dürfen einfach weg.** Laravels
+  Auth- und Mail-Provider lesen ihre Config erst, wenn jemand `Auth::` oder
+  `Mail::` anfasst — das Framework bootet ohne beide Dateien anstandslos. Die
+  `MAIL_MAILER`- und `BCRYPT_ROUNDS`-Zeilen in `phpunit.xml` stehen noch da,
+  sie zeigen jetzt ins Leere und schaden nicht; wer dort aufräumt, ändert die
+  Testumgebung und nicht die App.
+- **`migrate:fresh` legt nur noch vier Tabellen an:** `migrations`,
+  `listen_artikel`, `mealie_cache`, `einstellungen`. Die Jobs-Migrationen des
+  NativePHP-Pakets (`9999_12_31_*`) laufen in der lokalen Umgebung gar nicht
+  mit — sie sind auf `Schema::hasTable()` abgesichert und kämen erst im
+  Paketkontext zum Zug.
+- **Die Android-Theme-Dateien sind der stille Sonderfall.** `native:install`
+  schreibt sie einmal aus `config/nativephp.php`; danach liest Gradle nur noch
+  `nativephp/android/` (gitignoriert). Jede spätere Farbänderung in der Config
+  kommt also **nie** auf dem Gerät an, ohne dass irgendwo ein Fehler auftaucht.
+  Dasselbe gilt für alles andere, was `native:install` aus der Config ins
+  Android-Projekt generiert (App-ID, Icon, Splash) — wer so etwas ändert,
+  muss entweder neu installieren oder den Release-Ablauf nachziehen lassen.
+- **`native:install` ist als Build-Schritt keine Option.** `ensureAppIdIsSet()`
+  fragt interaktiv nach der Bundle-ID, sobald `NATIVEPHP_APP_ID` in der `.env`
+  leer ist (bei uns ist sie leer, die ID kommt aus der Config) — im
+  Kindprozess ohne TTY schriebe es eine geratene ID in die `.env`. Außerdem
+  löscht der Default (`forcing = true`, abschaltbar nur über `--no-force`) das
+  ganze `nativephp/android`-Verzeichnis. Deshalb patcht `AndroidTheme` gezielt
+  die `<item name="…">`-Werte, statt die Datei neu zu erzeugen: Was das Paket
+  sonst noch ins Theme schreibt, bleibt dabei stehen.
+- **Unit-Tests haben keinen Container.** `tests/Pest.php` hängt `TestCase` nur
+  an `Feature`; in `tests/Unit` gibt es kein `config()`. Klassen, die dort
+  geprüft werden sollen, bekommen ihre Werte über den Konstruktor und eine
+  `ausKonfiguration()`-Fabrik daneben — die Fabrik ist dann der einzige
+  ungetestete Draht und wurde hier einmal von Hand gegen das echte
+  `nativephp/android` laufen gelassen.
+---
+<!-- chief-timing story="FEIN-008" duration_ms=394467 cost=13.071317 in=140 out=308 cache_create=220901 cache_read=5936149 -->

@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Einkaufen\Rueckgaengig;
 use App\Mealie\Sitzung;
 use App\Wochenplan\Sitzung as Wochenplansitzung;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,13 +27,5 @@ class AppServiceProvider extends ServiceProvider
         // gehören, nicht einem Aufruf — das Ergebnis des Bulk-Updates kommt
         // erst nach dem Rendern zurück und greift dann noch auf sie zu.
         $this->app->singleton(Rueckgaengig::class);
-    }
-
-    /**
-     * Bootstrap any application services.
-     */
-    public function boot(): void
-    {
-        URL::forceHttps();
     }
 }

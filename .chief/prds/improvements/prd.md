@@ -123,16 +123,17 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Nach einem Release-Build zeigt die installierte App beim Start das Splash-Bild passend zum aktiven Modus, ohne „Loading…"-Text, und auf dem Homescreen das neue Icon.
 
 ### FEIN-008: Framework-Reste entfernen
+**Status:** done
 **Priority:** 8
 **Description:** Als Entwickler möchte ich, dass das Projekt nur noch enthält, was die App braucht, damit auf dem Gerät keine unnötigen Datenbankschreibzugriffe passieren und niemand beim Lesen des Codes über Auth oder Mail stolpert.
 
 **Acceptance Criteria:**
-- [ ] Entfernt sind: das User-Model, die User-Factory (samt Factory-Namespace in `composer.json`), der Database-Seeder, `config/auth.php`, `config/mail.php`, der erzwungene HTTPS-Aufruf im App-Service-Provider sowie die Migrationen für `users`, `password_reset_tokens`, `sessions`, `cache`/`cache_locks` und `jobs`/`job_batches`/`failed_jobs`.
-- [ ] `config/session.php`, `config/cache.php` und `config/queue.php` bleiben, weil die nativen Routen in der Web-Middleware mit Session laufen und die Callback-Verwaltung des Pakets den Laravel-Cache anspricht.
-- [ ] In `.env` und `.env.example` steht `SESSION_DRIVER=array`, `CACHE_STORE=file`, `QUEUE_CONNECTION=sync`. Tote Keys sind entfernt: `BCRYPT_ROUNDS`, alle `MAIL_*`, `APP_FAKER_LOCALE`, `SESSION_ENCRYPT`, `SESSION_PATH`, `SESSION_DOMAIN`, `SESSION_LIFETIME`, `APP_MAINTENANCE_DRIVER`, `FILESYSTEM_DISK`, `BROADCAST_CONNECTION`.
-- [ ] Nach `php artisan migrate:fresh` enthält die App-Datenbank aus eigenen Migrationen nur `listen_artikel`, `mealie_cache` und die Einstellungen-Tabelle aus FEIN-001 (plus `migrations` und was das NativePHP-Paket selbst anlegt).
-- [ ] Der bestehende Geheimnisse-Test, der Arch-Test und die gesamte Suite laufen unverändert grün.
-- [ ] Nach einem Release-Build enthalten die generierten Android-Theme-Dateien (`values/themes.xml`, `values-night/themes.xml`) die Indigo-Werte aus `config/nativephp.php` (`#4F46E5` bzw. `#818CF8`) statt Schwarz/Weiß, sodass Alert- und Picker-Buttons Indigo sind.
+- [x] Entfernt sind: das User-Model, die User-Factory (samt Factory-Namespace in `composer.json`), der Database-Seeder, `config/auth.php`, `config/mail.php`, der erzwungene HTTPS-Aufruf im App-Service-Provider sowie die Migrationen für `users`, `password_reset_tokens`, `sessions`, `cache`/`cache_locks` und `jobs`/`job_batches`/`failed_jobs`.
+- [x] `config/session.php`, `config/cache.php` und `config/queue.php` bleiben, weil die nativen Routen in der Web-Middleware mit Session laufen und die Callback-Verwaltung des Pakets den Laravel-Cache anspricht.
+- [x] In `.env` und `.env.example` steht `SESSION_DRIVER=array`, `CACHE_STORE=file`, `QUEUE_CONNECTION=sync`. Tote Keys sind entfernt: `BCRYPT_ROUNDS`, alle `MAIL_*`, `APP_FAKER_LOCALE`, `SESSION_ENCRYPT`, `SESSION_PATH`, `SESSION_DOMAIN`, `SESSION_LIFETIME`, `APP_MAINTENANCE_DRIVER`, `FILESYSTEM_DISK`, `BROADCAST_CONNECTION`.
+- [x] Nach `php artisan migrate:fresh` enthält die App-Datenbank aus eigenen Migrationen nur `listen_artikel`, `mealie_cache` und die Einstellungen-Tabelle aus FEIN-001 (plus `migrations` und was das NativePHP-Paket selbst anlegt).
+- [x] Der bestehende Geheimnisse-Test, der Arch-Test und die gesamte Suite laufen unverändert grün.
+- [x] Nach einem Release-Build enthalten die generierten Android-Theme-Dateien (`values/themes.xml`, `values-night/themes.xml`) die Indigo-Werte aus `config/nativephp.php` (`#4F46E5` bzw. `#818CF8`) statt Schwarz/Weiß, sodass Alert- und Picker-Buttons Indigo sind.
 
 ## 4. Funktionale Anforderungen
 
