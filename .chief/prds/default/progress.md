@@ -54,6 +54,15 @@
   gibt es dort nicht. Den Namen in der Komponente auswählen
   (`IconResolver::resolve(null, Ios::X, Android::Y)['icon'] ?? Android::Y->value`)
   und per `$this->view('name', [...])` ins Blade reichen.
+- **Kommando-Flags nur aus `php artisan <cmd> --help`**, nie aus dem Gedächtnis:
+  `native:run` hat `-W/--watch` und `--build=debug|release|bundle`,
+  `native:package` dagegen `--build-type=release|bundle`. Ähnliche Namen,
+  verschiedene Kommandos.
+- **Betriebswissen gehört in `README.md`** (Setup, Build, Signierung, Katalog,
+  Plugin-Struktur). Überprüfbare Zusagen daraus — „X ist gitignored“,
+  Konfigurationswerte — stehen als Test in `tests/Feature/GeheimnisseTest.php`;
+  git-Zusagen über `git check-ignore -q`, nicht über `str_contains()` auf der
+  `.gitignore`.
 - **Ein zweites `Http::fake()` ersetzt das erste nicht**, es reiht sich
   dahinter ein. Wechselnde Antworten innerhalb eines Tests brauchen *einen*
   Fake mit Closure über einer `&$referenz`.
@@ -1143,3 +1152,57 @@ mit 19 × „Unknown native element type“ — keine andere Fehlerart.
   der schnellste Überblick.
 ---
 <!-- chief-timing story="EKL-013" duration_ms=285497 cost=10.708470 in=102 out=257 cache_create=241562 cache_read=4105585 -->
+
+## 2026-09-20 - EKL-014
+
+Die README ersetzt die bisherigen 30 Zeilen durch neun Abschnitte: Voraussetzungen,
+Einrichtung, Entwickeln/Bauen, Mealie-Token, Release-Signierung, Katalog und
+Label-Aliase, SecureStorage-Plugin, Tests, Projektstruktur. Geschrieben für den
+Ben in einem halben Jahr, nicht für einen fremden Beitragenden — sie erklärt die
+Fallen (leere `.env`-Platzhalter, `BRIDGE_UNAVAILABLE` ohne Allowlist-Eintrag,
+dauerhaft rotes `native:validate`), nicht Laravel.
+
+Jede Angabe steht gegen die Quelle: `nativephp.lock` (PHP 8.5.10),
+`php artisan native:run --help` (`-W, --watch`), `config/nativephp.php`
+(`hot_reload.watch_paths`, `cleanup_env_keys`), `CreatesAndroidCredentials.php`
+(Keystore nach `credentials/`, vier `ANDROID_*`-Variablen),
+`native:package --build-type=bundle`, `App\Mealie\Verbindung` (`/api/users/self`
++ `/api/app/about`).
+
+Dazu ein Wächter-Test `tests/Feature/GeheimnisseTest.php` für die drei Zusagen
+der README, die still brechen können: `credentials/`, `*.jks`, `*.keystore` und
+`.env` sind git-ignoriert (geprüft über `git check-ignore`, nicht über einen
+String-Vergleich in der `.gitignore`); `ANDROID_KEYSTORE_*` und
+`ANDROID_KEY_PASSWORD` stehen in `cleanup_env_keys`; in `config/mealie.php` und
+`.env.example` steht kein Token. Muster ist `AppIdentitaetTest.php`.
+
+**Dateien**
+
+- `README.md` — neu geschrieben
+- `tests/Feature/GeheimnisseTest.php` — neu (8 Tests)
+
+193 Tests, 1266 Assertions, grün. Pint sauber. `native:validate` unverändert rot
+mit 19 × „Unknown native element type“.
+
+**Learnings für die nächsten Iterationen**
+
+- **`--help` ist die einzige verlässliche Quelle für Kommando-Flags.**
+  `native:run` hat `-W/--watch`, `native:package` hat `--build-type=release|bundle`
+  (nicht `--build`), `native:run` hat `--build=debug|release|bundle`. Die beiden
+  Flags heißen verschieden und meinen Ähnliches — leicht zu verwechseln.
+- **`credentials/` ist noch nicht angelegt**, `native:credentials android` legt
+  den Ordner selbst an und ergänzt die `.gitignore`. Die `.gitignore` dieses
+  Repos hat `/credentials`, `*.keystore` und `*.jks` schon ab EKL-002.
+- **`git check-ignore -q <pfad>` in einem Test** ist die ehrliche Prüfung einer
+  „X ist gitignored“-Zusage: sie geht durch Gits echte Regel-Auswertung statt
+  durch `str_contains()` auf der Datei, hält also auch, wenn das Muster
+  umgeschrieben wird.
+- **Dokumentations-Stories haben trotzdem einen Test-Seam**, aber nur für
+  überprüfbare Zusagen (gitignore, Konfigurationswerte). Den README-Text selbst
+  zu assertieren wäre tautologisch — ein `assertStringContainsString` auf den
+  eigenen Absatz sagt nichts.
+- **Der Katalog hat 112 Artikel, nicht 113.** Die PRD schreibt an mehreren
+  Stellen 113; die README nennt bewusst 112, also den echten Stand von
+  `config/katalog.php`.
+---
+<!-- chief-timing story="EKL-014" duration_ms=279202 cost=11.309979 in=104 out=288 cache_create=284308 cache_read=3970696 -->

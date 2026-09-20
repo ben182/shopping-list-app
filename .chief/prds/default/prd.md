@@ -219,16 +219,17 @@ Prefix: `EKL`.
 - [x] Ein Architektur-Test stellt sicher, dass alle Klassen unter `App\NativeComponents` von `NativeComponent` erben und `render` implementieren.
 
 ### EKL-014: README mit Setup, Build und Betrieb
+**Status:** done
 **Priority:** 14
 **Blocked by:** EKL-006
 **Description:** Als Entwickler möchte ich in einer README nachlesen, wie ich die App baue, das Token hinterlege und den Katalog pflege, damit ich das in einem halben Jahr noch kann.
 
 **Acceptance Criteria:**
-- [ ] Die README (Deutsch) beschreibt: Voraussetzungen (PHP 8.5, Composer, Android Studio/SDK), `composer install`, `.env` anlegen, `php artisan native:install`, `php artisan native:run android`, Hot-Reload mit `--watch`.
-- [ ] Sie erklärt, wo das Mealie-Token erzeugt wird (Mealie → Profil → API-Tokens) und dass es in der App unter Einstellungen eingegeben wird, nie in `.env`.
-- [ ] Sie erklärt die Android-Signing-Variablen und dass Keystore und Passwörter außerhalb des Repos bleiben (`credentials/` ist gitignored).
-- [ ] Sie erklärt, wie man Katalog-Artikel und Label-Aliase ändert (Konfigurationsdateien) und dass Katalogänderungen ein App-Update erfordern.
-- [ ] Sie nennt die Struktur des SecureStorage-Plugins und dass Kotlin-Änderungen einen neuen `native:run` erfordern, PHP-Änderungen nicht.
+- [x] Die README (Deutsch) beschreibt: Voraussetzungen (PHP 8.5, Composer, Android Studio/SDK), `composer install`, `.env` anlegen, `php artisan native:install`, `php artisan native:run android`, Hot-Reload mit `--watch`.
+- [x] Sie erklärt, wo das Mealie-Token erzeugt wird (Mealie → Profil → API-Tokens) und dass es in der App unter Einstellungen eingegeben wird, nie in `.env`.
+- [x] Sie erklärt die Android-Signing-Variablen und dass Keystore und Passwörter außerhalb des Repos bleiben (`credentials/` ist gitignored).
+- [x] Sie erklärt, wie man Katalog-Artikel und Label-Aliase ändert (Konfigurationsdateien) und dass Katalogänderungen ein App-Update erfordern.
+- [x] Sie nennt die Struktur des SecureStorage-Plugins und dass Kotlin-Änderungen einen neuen `native:run` erfordern, PHP-Änderungen nicht.
 
 ## 4. Funktionale Anforderungen
 
