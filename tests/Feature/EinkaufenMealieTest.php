@@ -1121,3 +1121,52 @@ it('zeigt die Action „Alles abhaken“ nicht, wenn nur abgehakte Mealie-Artike
 
     Native::visit('/')->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
 });
+
+/*
+ * Ein Durchlauf über eine abgelegte Mealie-Antwort: dieselbe Datei, die eine
+ * echte Instanz liefern würde, einmal quer durch Zuordnung, Reihenfolge und
+ * Abgehakt-Block.
+ */
+
+/**
+ * Wie `mitMealie()`, nur antwortet Mealie mit dem Inhalt einer JSON-Fixture
+ * statt mit einer im Test gebauten Liste.
+ */
+function mitMealieFixture(string $dateiname): void
+{
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    Http::fake([
+        '*/api/households/shopping/items/*' => Http::response([]),
+        '*/api/households/shopping/items' => Http::response([]),
+        '*/api/households/shopping/lists/*' => Http::response(jsonFixture($dateiname)),
+    ]);
+}
+
+it('verteilt eine abgelegte Mealie-Antwort auf Katalog-, Alias- und eigene Gruppen', function () {
+    mitMealieFixture('mealie-einkaufsliste.json');
+
+    $screen = Native::visit('/');
+
+    // „Haushalt“ heißt wie eine Katalog-Gruppe und verschmilzt mit ihr,
+    // „Tiefkühlware“ landet über die Alias-Tabelle in „Tiefkühl“ — beide an
+    // ihrer Katalogposition (Anhang A: … Tiefkühl … Haushalt …). Dahinter die
+    // Gruppen, die es nur wegen Mealie gibt, alphabetisch.
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Tiefkühl', 'artikel' => ['1 Packung Erbsen']],
+        ['ueberschrift' => 'Haushalt', 'artikel' => ['2 Rollen Küchenpapier']],
+        ['ueberschrift' => 'Asia-Laden', 'artikel' => ['1 Glas Kimchi']],
+        ['ueberschrift' => 'Sonstiges', 'artikel' => ['3 Feuerzeuge']],
+    ]);
+
+    expect(navUntertitel($screen))->toBe('4 Artikel');
+
+    // Der abgehakte Artikel taucht in keiner Gruppe auf, sondern nur im
+    // eingeklappten Block am Ende.
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
+
+    $screen->tap('Abgehakt (1)');
+
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Hafermilch']);
+});

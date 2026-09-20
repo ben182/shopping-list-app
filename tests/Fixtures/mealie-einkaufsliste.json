@@ -1,0 +1,78 @@
+{
+    "id": "00000000-0000-4000-8000-000000000000",
+    "name": "Einkaufsliste",
+    "listItems": [
+        {
+            "id": "erbsen-1",
+            "display": "1 Packung Erbsen",
+            "checked": false,
+            "position": 0,
+            "createdAt": "2026-09-18T08:12:04.113045Z",
+            "label": {
+                "id": "label-tiefkuehlware",
+                "name": "Tiefkühlware"
+            },
+            "recipeReferences": [
+                {
+                    "recipeId": "3f1b7c9e-2f10-4f2a-9a4e-8c7d6b5a4321",
+                    "recipeQuantity": 1.0
+                }
+            ]
+        },
+        {
+            "id": "kuechenpapier-1",
+            "display": "2 Rollen Küchenpapier",
+            "checked": false,
+            "position": 1,
+            "createdAt": "2026-09-18T08:13:41.884210Z",
+            "label": {
+                "id": "label-haushalt",
+                "name": "Haushalt"
+            },
+            "recipeReferences": []
+        },
+        {
+            "id": "kimchi-1",
+            "display": "1 Glas Kimchi",
+            "checked": false,
+            "position": 2,
+            "createdAt": "2026-09-18T08:14:02.551903Z",
+            "label": {
+                "id": "label-asia-laden",
+                "name": "Asia-Laden"
+            },
+            "recipeReferences": []
+        },
+        {
+            "id": "feuerzeuge-1",
+            "display": "3 Feuerzeuge",
+            "checked": false,
+            "position": 3,
+            "createdAt": "2026-09-18T08:15:20.107664Z",
+            "label": null,
+            "recipeReferences": []
+        },
+        {
+            "id": "hafermilch-1",
+            "display": "1 Liter Hafermilch",
+            "checked": true,
+            "position": 4,
+            "createdAt": "2026-09-18T08:16:55.339018Z",
+            "label": {
+                "id": "label-milchprodukte",
+                "name": "Milchprodukte"
+            },
+            "recipeReferences": []
+        }
+    ],
+    "recipeReferences": [
+        {
+            "recipeId": "3f1b7c9e-2f10-4f2a-9a4e-8c7d6b5a4321",
+            "recipe": {
+                "id": "3f1b7c9e-2f10-4f2a-9a4e-8c7d6b5a4321",
+                "name": "Erbsensuppe",
+                "slug": "erbsensuppe"
+            }
+        }
+    ]
+}

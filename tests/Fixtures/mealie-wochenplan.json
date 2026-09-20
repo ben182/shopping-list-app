@@ -1,0 +1,73 @@
+{
+    "page": 1,
+    "per_page": 100,
+    "total": 5,
+    "total_pages": 1,
+    "items": [
+        {
+            "id": 812,
+            "date": "2026-09-23",
+            "entryType": "dessert",
+            "title": "",
+            "text": "",
+            "recipeId": "9c2f5d41-7b3e-4a18-8f6c-1d0e2a3b4c5d",
+            "recipe": {
+                "id": "9c2f5d41-7b3e-4a18-8f6c-1d0e2a3b4c5d",
+                "name": "Tiramisu",
+                "slug": "tiramisu",
+                "image": "min-original.webp"
+            }
+        },
+        {
+            "id": 810,
+            "date": "2026-09-23",
+            "entryType": "lunch",
+            "title": "",
+            "text": "",
+            "recipeId": "5a8c1e77-4d92-4c3b-b0a7-6e5f4d3c2b1a",
+            "recipe": {
+                "id": "5a8c1e77-4d92-4c3b-b0a7-6e5f4d3c2b1a",
+                "name": "Kürbissuppe",
+                "slug": "kuerbissuppe",
+                "image": "min-original.webp"
+            }
+        },
+        {
+            "id": 809,
+            "date": "2026-09-23",
+            "entryType": "breakfast",
+            "title": "",
+            "text": "",
+            "recipeId": "2b7e9f03-8a14-4d5e-9c6b-3f2a1d0e9b8c",
+            "recipe": {
+                "id": "2b7e9f03-8a14-4d5e-9c6b-3f2a1d0e9b8c",
+                "name": "Müsli mit Beeren",
+                "slug": "muesli-mit-beeren",
+                "image": "min-original.webp"
+            }
+        },
+        {
+            "id": 805,
+            "date": "2026-09-21",
+            "entryType": "dinner",
+            "title": "",
+            "text": "",
+            "recipeId": "7d4a2c88-9e05-4b61-a2f3-8c7b6a5d4e3f",
+            "recipe": {
+                "id": "7d4a2c88-9e05-4b61-a2f3-8c7b6a5d4e3f",
+                "name": "Lasagne",
+                "slug": "lasagne",
+                "image": "min-original.webp"
+            }
+        },
+        {
+            "id": 820,
+            "date": "2026-09-27",
+            "entryType": "dinner",
+            "title": "Essen gehen",
+            "text": "Bei Luigi um 19 Uhr",
+            "recipeId": null,
+            "recipe": null
+        }
+    ]
+}

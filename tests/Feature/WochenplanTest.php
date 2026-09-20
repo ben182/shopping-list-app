@@ -661,3 +661,54 @@ it('behält beim Wochenwechsel die gecachte Woche und zeigt nur der leeren den F
     $screen->assertDontSee('Wochenplan konnte nicht geladen werden');
     expect(wochenplanZeile($screen, 'Lasagne'))->not->toBeNull();
 });
+
+/*
+ * Ein Durchlauf über eine abgelegte Mealie-Antwort: dieselbe Datei, die eine
+ * echte Instanz für diese Woche liefern würde, einmal quer durch Tage,
+ * Mahlzeitentypen und Sortierung.
+ */
+
+/** Wie `mitWochenplan()`, nur kommen die Einträge aus einer JSON-Fixture. */
+function mitWochenplanFixture(string $dateiname): void
+{
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    Http::fake(['*/api/households/mealplans*' => Http::response(jsonFixture($dateiname))]);
+}
+
+it('baut aus einer abgelegten Mealie-Antwort die ganze Woche', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+    mitWochenplanFixture('mealie-wochenplan.json');
+
+    $screen = Native::visit('/wochenplan');
+
+    expect(tagesUeberschriften($screen))->toBe([
+        'Montag, 21.09.',
+        'Dienstag, 22.09.',
+        'Mittwoch, 23.09. · Heute',
+        'Donnerstag, 24.09.',
+        'Freitag, 25.09.',
+        'Samstag, 26.09.',
+        'Sonntag, 27.09.',
+    ]);
+
+    // Die Fixture führt den Mittwoch in Mealies Reihenfolge (Dessert, Mittag,
+    // Frühstück); auf dem Schirm steht er nach Mahlzeitentyp sortiert. Die
+    // vier Tage ohne Eintrag bekommen je eine Zeile „Nichts geplant“.
+    expect(array_column(wochenplanInhalt($screen), 'text'))->toBe([
+        'Montag, 21.09.', 'Lasagne',
+        'Dienstag, 22.09.', 'Nichts geplant',
+        'Mittwoch, 23.09. · Heute', 'Müsli mit Beeren', 'Kürbissuppe', 'Tiramisu',
+        'Donnerstag, 24.09.', 'Nichts geplant',
+        'Freitag, 25.09.', 'Nichts geplant',
+        'Samstag, 26.09.', 'Nichts geplant',
+        'Sonntag, 27.09.', 'Essen gehen',
+    ]);
+
+    expect(wochenplanZeile($screen, 'Müsli mit Beeren')['props']['overline'] ?? null)->toBe('Frühstück')
+        ->and(wochenplanZeile($screen, 'Kürbissuppe')['props']['overline'] ?? null)->toBe('Mittag')
+        ->and(wochenplanZeile($screen, 'Tiramisu')['props']['overline'] ?? null)->toBe('Dessert')
+        ->and(wochenplanZeile($screen, 'Lasagne')['props']['overline'] ?? null)->toBe('Abend')
+        ->and(wochenplanZeile($screen, 'Essen gehen')['props']['supporting'] ?? null)->toBe('Bei Luigi um 19 Uhr');
+});

@@ -173,6 +173,10 @@
   `App\Wochenplan\Uebersicht::tage()`.
 - **`Http::fake()` zweimal aufrufen ersetzt nichts** — für aufeinanderfolgende
   Antworten `Http::fakeSequence('<muster>')->push(…)`.
+- **Echte Mealie-Antworten liegen als JSON in `tests/Fixtures/`** und kommen
+  mit `jsonFixture('datei.json')` (Helfer in `tests/Pest.php`) direkt in
+  `Http::response()`. Der Name `fixture()` ist von Pest belegt — ein eigener
+  Helfer so benannt ist ein Fatal Error beim Booten der Suite.
 
 ---
 
@@ -1073,3 +1077,69 @@ mit 19 × „Unknown native element type“ — keine andere Fehlerart.
   (`@php($banner = $this->banner())`) — jeder Aufruf geht sonst erneut an die
   Sitzung und damit an den Cache.
 <!-- chief-timing story="EKL-012" duration_ms=376226 cost=10.015508 in=98 out=412 cache_create=199898 cache_read=4156700 -->
+
+## 2026-09-20 - EKL-013
+
+Die Kern-Flows der vier Screens waren zum größten Teil schon abgedeckt — jede
+Story hat ihre Tests mitgebracht. Gefehlt haben die beiden Durchläufe über
+**abgelegte Mealie-Antworten** (die PRD verlangt ausdrücklich JSON-Fixtures)
+und die Klammer um den Vorrat→Einkaufen-Flow in *einem* Test.
+
+Neu ist `tests/Fixtures/` mit zwei Dateien in Mealies echter Antwortform:
+`mealie-einkaufsliste.json` (Artikel mit Label „Haushalt“, „Tiefkühlware“,
+unbekanntem „Asia-Laden“, ohne Label, einer abgehakt) und
+`mealie-wochenplan.json` (eine Woche mit Mittwoch in Mealies unsortierter
+Reihenfolge, vier leeren Tagen und einem Eintrag ohne Rezept). Zwei Tests
+fahren sie durch den Screen: Abschnittsfolge Tiefkühl → Haushalt →
+Asia-Laden → Sonstiges samt „Abgehakt (1)“, und die sieben Tagesüberschriften
+mit deutschen Mahlzeitentypen, „Nichts geplant“ und der Sortierung innerhalb
+des Mittwochs.
+
+Der Tab-Wechsel-Test in `EinkaufenTest.php` prüft jetzt in einem Durchlauf
+beides: der angetippte Artikel verschwindet aus dem Vorrat *und* steht auf dem
+Einkaufen-Screen an seiner Katalogposition.
+
+Alle übrigen Kriterien waren bereits erfüllt und wurden einzeln nachgeprüft:
+Suche (Treffer, Groß-/Kleinschreibung, „Keine Treffer für …“) in
+`VorratTest.php`; „Alles abhaken“ mit Dialogzahlen und Leerzustand in
+`EinkaufenTest.php` / `EinkaufenMealieTest.php`; `PUT` mit `checked: true` für
+die richtige ID und Rückkehr bei HTTP 500; Banner mit „Stand“ über gecachten
+Artikeln; `SecureStorage.Set`, „Kein Token hinterlegt“ (`not_found`) und
+„Gerät gesperrt, Token nicht lesbar“ (`unavailable`) in
+`EinstellungenTest.php`; der Architektur-Test in `tests/Unit/ArchTest.php`.
+
+**Dateien**
+
+- `tests/Fixtures/mealie-einkaufsliste.json`, `tests/Fixtures/mealie-wochenplan.json` — neu
+- `tests/Pest.php` — `jsonFixture()`
+- `tests/Feature/EinkaufenMealieTest.php` — `mitMealieFixture()` + 1 Test
+- `tests/Feature/WochenplanTest.php` — `mitWochenplanFixture()` + 1 Test
+- `tests/Feature/EinkaufenTest.php` — Tab-Wechsel-Test um die Vorrat-Seite erweitert
+
+185 Tests, 1257 Assertions, grün. Pint sauber. `native:validate` unverändert rot
+mit 19 × „Unknown native element type“ — keine andere Fehlerart.
+
+**Learnings für die nächsten Iterationen**
+
+- **`fixture()` ist von Pest belegt** (`Pest\Functions`, seit v4) — ein eigener
+  Helfer dieses Namens in `tests/Pest.php` ist ein Fatal Error beim Booten,
+  nicht erst beim Test. Der Helfer heißt deshalb `jsonFixture()`.
+- **Fixture-Dateien liegen in `tests/Fixtures/`** und enthalten die *ganze*
+  Antwort, nicht nur die Liste — `jsonFixture('datei.json')` geht direkt in
+  `Http::response()`. Wer eine neue Fixture anlegt, muss die Item-Felder
+  treffen, die die Parser lesen: Einkaufsliste `id/display/checked/position/
+  createdAt/label.name/recipeReferences`, Wochenplan `date/entryType/title/
+  text/recipe.{id,name,slug,image}`.
+- **Fixture-Tests brauchen ihre eigene `mit…Fixture()`-Funktion**: `mitMealie()`
+  und `mitWochenplan()` bauen den Antwortkörper selbst und können ihn nicht
+  ersetzen. Die Reihenfolge der `Http::fake()`-Muster bleibt dieselbe Falle —
+  `…/items/*`, `…/items`, dann `…/lists/*`.
+- **Ein Fixture-Test ist die günstigste Stelle für Reihenfolge-Aussagen**: eine
+  Datei mit absichtlich unsortierten Einträgen prüft Sortierung und Gruppierung
+  in einem Zug, ohne dass der Test dieselbe Rechnung wie der Code anstellt.
+- **Abdeckung erst prüfen, dann schreiben.** Sieben der acht Kriterien dieser
+  Story standen schon in den Testdateien der Vorgänger-Stories; nachgebaut
+  hätte das nur Laufzeit gekostet. `grep -nE "^it\(" tests/Feature/*.php` ist
+  der schnellste Überblick.
+---
+<!-- chief-timing story="EKL-013" duration_ms=285497 cost=10.708470 in=102 out=257 cache_create=241562 cache_read=4105585 -->

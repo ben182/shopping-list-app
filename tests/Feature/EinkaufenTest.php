@@ -62,8 +62,12 @@ it('zeigt einen im Vorrat hinzugefügten Artikel beim Tab-Wechsel an seiner Kata
 
     // Derselbe Weg wie auf dem Gerät: im Vorrat antippen, dann unten auf den
     // Einkaufen-Tab — der Tab-Wechsel ersetzt den Root-Screen.
-    $einkaufen = Native::visit('/vorrat')
-        ->tap('Tomaten')
+    $vorrat = Native::visit('/vorrat')->tap('Tomaten');
+
+    expect(collect(listenAbschnitte($vorrat))->firstWhere('ueberschrift', 'Obst & Gemüse')['artikel'])
+        ->not->toContain('Tomaten');
+
+    $einkaufen = $vorrat
         ->tap('Einkaufen')
         ->assertReplacedWith('/')
         ->follow();

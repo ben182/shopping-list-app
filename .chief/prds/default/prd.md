@@ -203,19 +203,20 @@ Prefix: `EKL`.
 - [x] Löschen des Tokens löscht alle gecachten Wochen.
 
 ### EKL-013: Automatisierte Tests der Kern-Flows
+**Status:** done
 **Priority:** 13
 **Blocked by:** EKL-004, EKL-005, EKL-009, EKL-010, EKL-012
 **Description:** Als Entwickler möchte ich die Kern-Flows der vier Screens automatisiert prüfen, damit Änderungen am Katalog, an der Gruppierung oder an der Mealie-Anbindung nicht unbemerkt etwas kaputt machen.
 
 **Acceptance Criteria:**
-- [ ] Ein Pest-Test besucht den Vorrat, tippt einen Artikel an und prüft, dass er im Vorrat verschwindet und auf dem Einkaufen-Screen in der richtigen Gruppe erscheint; ein weiterer Test prüft die Suche (Treffer, Groß-/Kleinschreibung, Leerzustand „Keine Treffer für …“).
-- [ ] Ein Pest-Test prüft „Alles abhaken“: Dialog-Text mit korrekten Zahlen, Leerzustand danach.
-- [ ] Ein Pest-Test füttert den Einkaufen-Screen über `Http::fake()` mit einer Mealie-Fixture (JSON-Datei mit mindestens: ein Artikel mit Label „Haushalt“, einer mit „Tiefkühlware“, einer mit einem unbekannten Label „Asia-Laden“, einer ohne Label, einer abgehakt) und prüft: „Haushalt“ verschmilzt mit der Katalog-Gruppe, „Tiefkühlware“ landet in „Tiefkühl“, „Asia-Laden“ erscheint als eigene Gruppe hinter den Katalog-Gruppen, der Artikel ohne Label unter „Sonstiges“, der abgehakte nur im Abschnitt „Abgehakt (1)“.
-- [ ] Ein Pest-Test prüft das Abhaken eines Mealie-Artikels: der `PUT`-Aufruf enthält `checked: true` für die richtige Artikel-ID; bei gefaktem HTTP 500 kehrt der Artikel zurück.
-- [ ] Ein Pest-Test prüft den Fehlerzustand: mit gefülltem Cache und gefaktem Netzwerkfehler erscheint das Banner mit „Stand“, die gecachten Artikel bleiben sichtbar.
-- [ ] Ein Pest-Test prüft den Einstellungen-Screen mit `Native::fakeBridge()`: Speichern ruft `SecureStorage.Set` mit dem eingegebenen Wert auf; Status „Kein Token hinterlegt“ bei `not_found`, „Gerät gesperrt, Token nicht lesbar“ bei `unavailable`.
-- [ ] Ein Pest-Test prüft den Wochenplan mit Fixture: 7 Tagesüberschriften, deutsche Mahlzeitentyp-Labels, „Nichts geplant“ für leere Tage, Sortierung innerhalb eines Tages.
-- [ ] Ein Architektur-Test stellt sicher, dass alle Klassen unter `App\NativeComponents` von `NativeComponent` erben und `render` implementieren.
+- [x] Ein Pest-Test besucht den Vorrat, tippt einen Artikel an und prüft, dass er im Vorrat verschwindet und auf dem Einkaufen-Screen in der richtigen Gruppe erscheint; ein weiterer Test prüft die Suche (Treffer, Groß-/Kleinschreibung, Leerzustand „Keine Treffer für …“).
+- [x] Ein Pest-Test prüft „Alles abhaken“: Dialog-Text mit korrekten Zahlen, Leerzustand danach.
+- [x] Ein Pest-Test füttert den Einkaufen-Screen über `Http::fake()` mit einer Mealie-Fixture (JSON-Datei mit mindestens: ein Artikel mit Label „Haushalt“, einer mit „Tiefkühlware“, einer mit einem unbekannten Label „Asia-Laden“, einer ohne Label, einer abgehakt) und prüft: „Haushalt“ verschmilzt mit der Katalog-Gruppe, „Tiefkühlware“ landet in „Tiefkühl“, „Asia-Laden“ erscheint als eigene Gruppe hinter den Katalog-Gruppen, der Artikel ohne Label unter „Sonstiges“, der abgehakte nur im Abschnitt „Abgehakt (1)“.
+- [x] Ein Pest-Test prüft das Abhaken eines Mealie-Artikels: der `PUT`-Aufruf enthält `checked: true` für die richtige Artikel-ID; bei gefaktem HTTP 500 kehrt der Artikel zurück.
+- [x] Ein Pest-Test prüft den Fehlerzustand: mit gefülltem Cache und gefaktem Netzwerkfehler erscheint das Banner mit „Stand“, die gecachten Artikel bleiben sichtbar.
+- [x] Ein Pest-Test prüft den Einstellungen-Screen mit `Native::fakeBridge()`: Speichern ruft `SecureStorage.Set` mit dem eingegebenen Wert auf; Status „Kein Token hinterlegt“ bei `not_found`, „Gerät gesperrt, Token nicht lesbar“ bei `unavailable`.
+- [x] Ein Pest-Test prüft den Wochenplan mit Fixture: 7 Tagesüberschriften, deutsche Mahlzeitentyp-Labels, „Nichts geplant“ für leere Tage, Sortierung innerhalb eines Tages.
+- [x] Ein Architektur-Test stellt sicher, dass alle Klassen unter `App\NativeComponents` von `NativeComponent` erben und `render` implementieren.
 
 ### EKL-014: README mit Setup, Build und Betrieb
 **Priority:** 14

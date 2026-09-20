@@ -192,3 +192,20 @@ function fakeSecureStore(?string $anfangswert = null): FakeBridge
             return ['success' => true];
         });
 }
+
+/**
+ * Der Inhalt einer JSON-Fixture aus `tests/Fixtures` als Array — eine echte
+ * Mealie-Antwort, abgelegt statt im Test zusammengebaut. So prüft der Test
+ * gegen das, was der Server wirklich schickt, und nicht gegen die Vorstellung,
+ * die der Code davon hat.
+ *
+ * @return array<string, mixed>
+ */
+function jsonFixture(string $dateiname): array
+{
+    return json_decode(
+        (string) file_get_contents(__DIR__.'/Fixtures/'.$dateiname),
+        associative: true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+}
