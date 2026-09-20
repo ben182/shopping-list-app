@@ -61,3 +61,9 @@ it('meldet leere Werte als fehlend', function () {
         ->and($env->lesen('ANDROID_KEY_ALIAS'))->toBe('upload')
         ->and($env->lesen('GIBT_ES_NICHT'))->toBeNull();
 });
+
+it('nennt alle gesetzten Schlüssel der .env', function () {
+    $env = new EnvDatei(tempEnv("APP_NAME=Einkaufsliste\n\n# Kommentar\nMEALIE_URL=https://beispiel.test\nLEER=\n"));
+
+    expect($env->schluessel())->toBe(['APP_NAME', 'MEALIE_URL', 'LEER']);
+});

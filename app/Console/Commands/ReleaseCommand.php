@@ -69,7 +69,7 @@ final class ReleaseCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->option('skip-tests') && ! $this->testlauf()) {
+        if (! $this->option('skip-tests') && ! $this->testlauf($env)) {
             $this->error('Die Tests sind rot — nichts veröffentlicht.');
 
             return self::FAILURE;
@@ -168,12 +168,23 @@ final class ReleaseCommand extends Command
         return $hindernisse;
     }
 
-    private function testlauf(): bool
+    /**
+     * Der Testlauf bekommt die `.env` dieses Prozesses nicht mit.
+     *
+     * Laravel legt die Werte der `.env` in `$_SERVER` ab, von dort erbt sie
+     * jeder Kindprozess als echte Umgebungsvariable — und Laravel liest
+     * `$_SERVER` vor allem anderen, auch vor den `<env>`-Einträgen der
+     * `phpunit.xml`. Die Tests liefen sonst gegen `APP_ENV=local` und die
+     * echte Mealie-Instanz statt gegen ihre eigene Konfiguration.
+     */
+    private function testlauf(EnvDatei $env): bool
     {
         $this->components->info('Tests');
         $this->cachesLeeren();
 
-        return $this->artisan(['test'], timeout: 900)->successful();
+        $ohneEnvDatei = array_fill_keys($env->schluessel(), false);
+
+        return $this->artisan(['test'], timeout: 900, umgebung: $ohneEnvDatei)->successful();
     }
 
     private function bauen(): bool
@@ -368,11 +379,13 @@ final class ReleaseCommand extends Command
 
     /**
      * @param  list<string>  $argumente
+     * @param  array<string, string|false>  $umgebung
      */
-    private function artisan(array $argumente, int $timeout): ProcessResult
+    private function artisan(array $argumente, int $timeout, array $umgebung = []): ProcessResult
     {
         return Process::path(base_path())
             ->timeout($timeout)
+            ->env($umgebung)
             ->run(array_merge([PHP_BINARY, 'artisan'], $argumente), function (string $art, string $ausgabe): void {
                 $this->output->write($ausgabe);
             });

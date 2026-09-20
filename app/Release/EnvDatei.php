@@ -47,6 +47,18 @@ final class EnvDatei
         file_put_contents($this->pfad, $inhalt);
     }
 
+    /**
+     * Die Namen aller gesetzten Schlüssel.
+     *
+     * @return list<string>
+     */
+    public function schluessel(): array
+    {
+        preg_match_all('/^([A-Z0-9_]+)=/m', $this->inhalt(), $treffer);
+
+        return array_values(array_unique($treffer[1]));
+    }
+
     private function inhalt(): string
     {
         $inhalt = @file_get_contents($this->pfad);
