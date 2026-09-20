@@ -2,6 +2,7 @@
 
 namespace App\NativeComponents;
 
+use App\Mealie\Sitzung;
 use App\Mealie\Token;
 use App\Mealie\Verbindung;
 use Native\Mobile\Edge\Element;
@@ -116,6 +117,9 @@ class Einstellungen extends NativeComponent
      * Ohne Token ist die App von Mealie abgeschnitten, und zurückholen kann
      * man es nur mit dem Zettel aus Mealie — also erst fragen, dann löschen.
      * Jeder andere Ausgang des Dialogs lässt den Keystore in Ruhe.
+     *
+     * Mit dem Token geht auch der Mealie-Cache: was die App nicht mehr
+     * abrufen darf, soll sie auch nicht mehr aus der Schublade zeigen.
      */
     public function loeschenBestaetigen(): void
     {
@@ -132,6 +136,7 @@ class Einstellungen extends NativeComponent
             }
 
             app(Token::class)->loeschen();
+            app(Sitzung::class)->vergessen();
 
             $this->verbindung = null;
 

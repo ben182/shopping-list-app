@@ -1,5 +1,7 @@
 <?php
 
+use App\Mealie\Cache;
+use App\Mealie\Sitzung;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -251,4 +253,17 @@ it('bleibt für den Screenreader bedienbar', function () {
     fakeSecureStore('mealie-geheim-123');
 
     Native::visit('/einstellungen')->assertAccessible();
+});
+
+it('wirft mit dem Token auch die gecachte Mealie-Liste weg', function () {
+    fakeSecureStore('mealie-geheim-123');
+
+    app(Sitzung::class)->setzen([['id' => 'brokkoli-1', 'text' => '1 Kopf Brokkoli']]);
+
+    Native::visit('/einstellungen')
+        ->press('loeschenBestaetigen')
+        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Löschen']);
+
+    expect(app(Cache::class)->artikel())->toBe([]);
+    expect(app(Cache::class)->stand())->toBeNull();
 });

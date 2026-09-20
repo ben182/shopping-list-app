@@ -63,9 +63,12 @@ return [
     | will be used by the PHP date and date-time functions. The timezone
     | is set to "UTC" by default as it is suitable for most use cases.
     |
+    | Hier steht Europe/Berlin: die App zeigt Uhrzeiten an (den „Stand“ des
+    | Mealie-Caches), und die sollen die eines deutschen Haushalts sein.
+    |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Europe/Berlin',
 
     /*
     |--------------------------------------------------------------------------

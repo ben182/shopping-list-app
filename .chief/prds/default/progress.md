@@ -649,6 +649,15 @@ ersten `native:run` kompiliert.
   ihn mit und ohne `native:`-Präfix.
 - Für EKL-008/010: Mealie-Zeilen haben schon `ref="mealie-<itemId>"` und
   tragen die Mealie-Artikel-ID; `Sitzung::alle()` liefert auch die abgehakten.
+- **`Http::fake()` kennt kein Umschalten:** die zuerst registrierte passende
+  Regel gewinnt für immer. Zwei Phasen in einem Test brauchen *eine* Closure
+  mit einem Schalter darin, nicht zwei `Http::fake()`-Aufrufe.
+- **Persistenz prüft man mit `app()->forgetInstance(...)`** — der
+  App-Neustart im Test. SQLite bleibt, die Singletons gehen.
+- **`disabled` am `list-item` sperrt den Tap vollständig**
+  (`clickable(enabled = !disabled)`): eine gesperrte Zeile kann keinen
+  erklärenden Toast mehr auslösen. Wer beides will, dämpft die Zeile von
+  Hand über `theme('on-surface-variant')` statt über `disabled`.
 <!-- chief-timing story="EKL-007" duration_ms=1121031 cost=69.944824 in=538 out=2271 cache_create=766285 cache_read=36932390 -->
 
 ## 2026-09-20 - EKL-008
@@ -733,3 +742,99 @@ nachher). Die Web-UI liest denselben Zustand.
   Rücknahme-Logik (`mealieAenderungZuruecknehmen`) lässt sich pro Artikel
   wiederverwenden.
 <!-- chief-timing story="EKL-008" duration_ms=562585 cost=19.720382 in=174 out=688 cache_create=279820 cache_read=9613031 -->
+
+## 2026-09-20 - EKL-009
+
+Die Mealie-Liste liegt jetzt in SQLite. Jede erfolgreich geladene Liste
+ersetzt den Datensatz in `mealie_cache` (ein Schlüssel `einkaufsliste`,
+Artikel als JSON, `geladen_am`), die `Sitzung` füllt sich beim ersten
+Zugriff daraus und zeigt die Artikel deshalb sofort — auch beim ersten
+Tab-Öffnen nach einem App-Neustart, während die neue Antwort noch
+unterwegs ist. Ein Tap auf eine Mealie-Zeile schreibt den umgelegten
+Haken mit in den Cache, lässt den `Stand` aber stehen: der meint den
+letzten *Ladevorgang*.
+
+Scheitert das Laden, merkt sich die Sitzung den Grund (`App\Mealie\Fehler`:
+Netz / Http / Token) und der Screen zeichnet unter der Top-Bar ein Banner
+(`App\Mealie\Fehlerzustand` liefert Text und Knopfbeschriftung):
+„Mealie nicht erreichbar · Stand HH:MM", bei einem Stand von einem anderen
+Tag „· Stand DD.MM. HH:MM", ohne Cache ohne den Zusatz; bei HTTP 401
+„Mealie-Token ungültig" mit „Einstellungen" statt „Erneut versuchen".
+Solange das Banner steht, tragen alle Mealie-Zeilen `disabled` und
+`mealieUmschalten()` antwortet nur noch mit dem Toast „Offline:
+Mealie-Artikel können gerade nicht geändert werden". Ein gelungenes
+Neuladen (Pull-to-Refresh, Banner-Knopf, Rückkehr in den Vordergrund)
+räumt Fehler und Sperre ab. Das Löschen des Tokens — in den Einstellungen
+und, als zweiter Riegel, beim nächsten Blick des Einkaufen-Screens auf
+einen leeren Keystore — wirft Liste und Cache weg.
+
+**Dateien**
+
+- `database/migrations/2026_09_20_114535_create_mealie_cache_table.php`,
+  `app/Models/MealieCache.php` — neu
+- `app/Mealie/Cache.php`, `app/Mealie/Fehler.php`,
+  `app/Mealie/Fehlerzustand.php` — neu
+- `app/Mealie/Sitzung.php` — cache-gestützt, `fehlerMelden()`,
+  `fehlerzustand()`, `vergessen()`
+- `app/Mealie/Eintrag.php` — `daten()` als Rückweg in die flache Form
+- `app/NativeComponents/Einkaufen.php` — `banner()`, Fehler aus `finished`
+  und `failed`, Sperre in `mealieUmschalten()`
+- `app/NativeComponents/Einstellungen.php` — löscht mit dem Token den Cache
+- `resources/views/native/einkaufen.blade.php` — Banner, `:disabled`
+- `config/app.php` — `timezone` auf `Europe/Berlin`
+- `tests/Feature/EinkaufenMealieTest.php` — 11 neue Tests,
+  `tests/Feature/EinstellungenTest.php` — 1 neuer Test
+
+138 Tests, 917 Assertions, grün. Pint sauber. `native:validate` rot mit
+denselben 11 „Unknown native element type"-Meldungen wie nach EKL-008,
+keine andere Fehlerart.
+
+**Offener Widerspruch in der Akzeptanz (EKL-009, Kriterium 5)**
+
+`disabled` am `list-item` und „ein Tap zeigt den Toast" schließen sich auf
+dem Gerät aus: `ListItemRenderer.kt` baut den Klick als
+`clickable(enabled = !disabled)`, ein Tap auf eine gesperrte Zeile erzeugt
+also gar kein Event. Umgesetzt ist der Buchstabe der Akzeptanz — `disabled`
+steht am Knoten (das graut die Checkbox aus, den Text lässt Material in
+Ruhe), der Toast-Handler hängt weiter am `@press` und ist getestet. Auf
+Android wird er so aber nie erscheinen. Wer den Toast wirklich will, muss
+`:disabled` fallen lassen und die Zeile stattdessen von Hand dämpfen
+(`headlineColor` über `theme('on-surface-variant')`, wie im Abschnitt
+„Abgehakt"); die Checkbox bliebe dann farbig. Das ist eine
+Produktentscheidung, keine technische.
+
+**Learnings für die nächsten Iterationen**
+
+- **`Http::fake()` ist nicht umschaltbar.** Ein zweites `Http::fake()` legt
+  seine Regel nur *hinter* die erste, und in `PendingRequest::send` gewinnt
+  die erste passende. Wer im selben Test erst eine Antwort und dann einen
+  Ausfall braucht, schreibt **eine** Closure mit einem Schalter darin —
+  `mealieAntwortetDannNicht()` gibt ihn zurück (`$ausfall()` / `$ausfall(false)`).
+- **App-Neustart im Test ist `app()->forgetInstance(Sitzung::class)`**
+  (Helfer `appNeuStarten()`): die Singletons fallen weg, SQLite bleibt.
+  Genau die Grenze, an der sich zeigt, ob etwas wirklich persistiert.
+- **„Zeigt der Screen das schon, bevor die Antwort da ist?"** lässt sich mit
+  `AsyncTask::fake()` (inline!) nur *innerhalb* der `Http::fake()`-Closure
+  beantworten: dort steht der Ladevorgang, und `app(Uebersicht::class)
+  ->abschnitte()` sagt, was der Screen in diesem Moment zeichnen würde.
+- **`config('app.timezone')` steht jetzt auf `Europe/Berlin`** — die App
+  zeigt Uhrzeiten („Stand HH:MM"), und mit UTC wären die im Sommer zwei
+  Stunden daneben. Tests, die Zeiten prüfen, frieren mit
+  `CarbonImmutable::setTestNow()` ein.
+- **Der Cache ist bewusst breiter geschnitten als diese Story:** die Tabelle
+  hat einen `schluessel` und `App\Mealie\Cache` benutzt davon nur
+  `einkaufsliste`. EKL-012 braucht einen Eintrag je Wochenbereich — dafür
+  reicht eine zweite Klasse neben `Cache` mit demselben Modell.
+- **`Fehlerzustand` ist für EKL-012 mitgedacht**: Text und Knopfbeschriftung
+  hängen nur an `Fehler` und einem `?CarbonImmutable`, nicht am
+  Einkaufen-Screen. Das Wochenplan-Banner kann dieselbe Klasse benutzen.
+- **Ein `native:`-Tag mit bedingtem Handler wird doppelt geschrieben**, nicht
+  bedingt attribuiert: `@press` unterscheidet sich zwischen
+  „Erneut versuchen" und „Einstellungen", und ein `@if` in der Attributliste
+  zerlegt der Precompiler (bekanntes Muster, hier zum ersten Mal für zwei
+  *Handler* statt zwei Werte gebraucht).
+- Für EKL-010: `app(Sitzung::class)->fehlerzustand() !== null` ist die Frage
+  „ist Mealie gerade im Fehlerzustand?" — genau das, was der Dialog
+  „Alles abhaken?" braucht, um die Mealie-Zahl wegzulassen.
+---
+<!-- chief-timing story="EKL-009" duration_ms=636217 cost=17.515263 in=146 out=404 cache_create=274516 cache_read=8223732 -->

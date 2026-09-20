@@ -39,6 +39,24 @@ final readonly class Eintrag
         );
     }
 
+    /**
+     * Zurück in die flache Form, in der der Cache die Liste hält — genau
+     * die, die `ausDaten()` wieder einliest.
+     *
+     * @return array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool, roh: array<string, mixed>}
+     */
+    public function daten(): array
+    {
+        return [
+            'id' => $this->id,
+            'text' => $this->text,
+            'label' => $this->label,
+            'rezepte' => $this->rezepte,
+            'abgehakt' => $this->abgehakt,
+            'roh' => $this->roh,
+        ];
+    }
+
     /** Derselbe Artikel mit umgelegtem Haken. */
     public function mitHaken(bool $abgehakt): self
     {

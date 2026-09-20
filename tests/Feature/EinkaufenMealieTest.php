@@ -1,8 +1,12 @@
 <?php
 
+use App\Einkaufen\Uebersicht;
+use App\Einkaufen\Zeile;
 use App\Liste\EigeneListe;
+use App\Mealie\Sitzung;
 use App\Mealie\Token;
 use Ben182\AppLifecycle\Events\AppForegrounded;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\AsyncTask;
@@ -643,4 +647,303 @@ it('hält eigene Artikel aus dem Abschnitt „Abgehakt“ heraus und schickt sie
         ->firstWhere('ueberschrift', 'Kühlregal')['artikel'];
 
     expect($vorrat)->toContain('Tofu');
+});
+
+/*
+ * Ab hier: Cache und Fehlerzustand (EKL-009).
+ */
+
+/**
+ * Lässt Mealie antworten oder ausfallen, je nachdem, wie der zurückgegebene
+ * Schalter steht — `$ausfall()` für den Ausfall, `$ausfall(false)` zurück.
+ * Ein zweites `Http::fake()` täte das nicht: es legt seine Regel nur hinter
+ * die erste, und die trifft weiter zuerst.
+ *
+ * @param  list<array<string, mixed>>  $artikel
+ * @param  ?int  $status  HTTP-Status des Ausfalls; ohne Status ein Netzfehler
+ */
+function mealieAntwortetDannNicht(array $artikel, ?int $status = null): Closure
+{
+    $ausfall = false;
+
+    Http::fake(function () use ($artikel, $status, &$ausfall) {
+        if (! $ausfall) {
+            return Http::response(['listItems' => $artikel, 'recipeReferences' => []]);
+        }
+
+        if ($status === null) {
+            throw new ConnectionException('Zeitüberschreitung');
+        }
+
+        return Http::response([], $status);
+    });
+
+    return function (bool $aus = true) use (&$ausfall): void {
+        $ausfall = $aus;
+    };
+}
+
+/**
+ * Wie `mitMealie()`, nur mit einem Ausfall in der Hinterhand.
+ *
+ * @param  list<array<string, mixed>>  $artikel
+ */
+function mitMealieAusfall(array $artikel, ?int $status = null): Closure
+{
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    return mealieAntwortetDannNicht($artikel, $status);
+}
+
+/** Alles, was die App im Arbeitsspeicher hält, vergessen — der App-Neustart. */
+function appNeuStarten(): void
+{
+    app()->forgetInstance(Sitzung::class);
+}
+
+it('zeigt nach einem App-Neustart die gecachten Mealie-Artikel, obwohl Mealie nicht mehr antwortet', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    Native::visit('/');
+
+    appNeuStarten();
+    $ausfall();
+
+    expect(listenAbschnitte(Native::visit('/')))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+});
+
+it('zeigt bei einem Netzfehler das Banner mit dem Stand des letzten Ladens und behält die Artikel', function () {
+    CarbonImmutable::setTestNow('2026-09-20 14:05:00');
+
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie nicht erreichbar · Stand 14:05')
+        ->assertSee('Erneut versuchen');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+});
+
+it('nennt im Banner auch das Datum, wenn der Stand von einem anderen Tag ist', function () {
+    CarbonImmutable::setTestNow('2026-09-19 18:30:00');
+
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/');
+
+    CarbonImmutable::setTestNow('2026-09-20 08:00:00');
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie nicht erreichbar · Stand 19.09. 18:30');
+});
+
+it('zeigt dasselbe Banner, wenn Mealie mit einem Serverfehler antwortet', function () {
+    CarbonImmutable::setTestNow('2026-09-20 09:07:00');
+
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')], status: 500);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie nicht erreichbar · Stand 09:07');
+});
+
+it('zeichnet das Banner mit Warn-Icon und Text-Button', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/', platform: 'android');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'warning'
+        && ($node['props']['a11y_label'] ?? null) === 'Warnung');
+
+    expect(knotenMitRef($screen, 'mealie-banner-aktion')['props']['label'] ?? null)
+        ->toBe('Erneut versuchen');
+});
+
+it('meldet bei HTTP 401 ein ungültiges Token und führt aus dem Banner in die Einstellungen', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')], status: 401);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie-Token ungültig')
+        ->assertDontSee('Stand')
+        ->tap('mealie-banner-aktion')
+        ->assertNavigatedTo('/einstellungen');
+});
+
+it('sperrt die Mealie-Zeilen, solange das Banner steht, und sagt beim Tap warum', function () {
+    $ausfall = mitMealieAusfall([
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1'),
+        mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true, id: 'milch-1'),
+    ]);
+
+    $screen = Native::visit('/')->tap('Abgehakt (1)');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    expect(knotenMitRef($screen, 'mealie-brokkoli-1')['props']['disabled'] ?? null)->toBeTrue();
+    expect(knotenMitRef($screen, 'abgehakt-milch-1')['props']['disabled'] ?? null)->toBeTrue();
+
+    $screen->press("mealieUmschalten('brokkoli-1')");
+
+    $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Offline: Mealie-Artikel können gerade nicht geändert werden');
+
+    // Der Artikel steht noch da, wo er stand, und Mealie hat nichts gehört.
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+
+    Http::assertNotSent(fn ($anfrage) => $anfrage->method() === 'PUT');
+});
+
+it('lässt eigene Artikel bedienbar, während das Banner steht', function () {
+    eigeneArtikel('tofu');
+
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1')]);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    expect(knotenMitRef($screen, 'einkaufen-tofu')['props']['disabled'] ?? false)->toBeFalse();
+
+    $screen->tap('Tofu');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+});
+
+it('nimmt das Banner wieder weg, sobald ein Neuladen gelingt', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1')]);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
+    $screen->assertSee('Mealie nicht erreichbar');
+
+    $ausfall(false);
+    $screen->press('neuLaden');
+
+    $screen->assertDontSee('Mealie nicht erreichbar');
+    expect(knotenMitRef($screen, 'mealie-brokkoli-1')['props']['disabled'] ?? false)->toBeFalse();
+});
+
+it('nimmt das Banner auch weg, wenn die App in den Vordergrund zurückkehrt und Mealie wieder da ist', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
+    $screen->assertSee('Mealie nicht erreichbar');
+
+    $ausfall(false);
+    $screen->emitNative(AppForegrounded::class);
+
+    $screen->assertDontSee('Mealie nicht erreichbar');
+});
+
+it('zeigt ohne Cache nur das Banner und darunter den Leerzustand', function () {
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+    Http::fake(fn () => throw new ConnectionException('Zeitüberschreitung'));
+
+    $screen = Native::visit('/');
+
+    $screen->assertSee('Mealie nicht erreichbar')
+        ->assertDontSee('Stand')
+        ->assertSee('Liste ist leer.');
+
+    expect(listenAbschnitte($screen))->toBe([]);
+});
+
+it('zeigt ohne Cache das Banner über den eigenen Artikeln', function () {
+    eigeneArtikel('tofu');
+
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+    Http::fake(fn () => throw new ConnectionException('Zeitüberschreitung'));
+
+    $screen = Native::visit('/');
+
+    $screen->assertSee('Mealie nicht erreichbar')
+        ->assertDontSee('Liste ist leer.');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+});
+
+it('vergisst den Cache, sobald kein Token mehr hinterlegt ist', function () {
+    eigeneArtikel('tofu');
+
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    Native::visit('/');
+
+    app(Token::class)->loeschen();
+    appNeuStarten();
+
+    $screen = Native::visit('/');
+
+    $screen->assertSee('Mealie nicht verbunden')
+        ->assertDontSee('1 Kopf Brokkoli');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+});
+
+it('hat die gecachten Artikel schon auf dem Schirm, während die neue Antwort noch unterwegs ist', function () {
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    $aufruf = 0;
+    $waehrendDesZweitenLadens = null;
+
+    Http::fake(function () use (&$aufruf, &$waehrendDesZweitenLadens) {
+        $aufruf++;
+
+        if ($aufruf === 2) {
+            // Was der Screen in diesem Moment zeichnen würde: der Cache,
+            // noch vor der Antwort, die gleich zurückkommt.
+            $waehrendDesZweitenLadens = array_map(
+                fn (Zeile $zeile) => $zeile->text,
+                app(Uebersicht::class)->abschnitte()[0]->zeilen ?? [],
+            );
+        }
+
+        return Http::response([
+            'listItems' => [$aufruf === 1
+                ? mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')
+                : mealieArtikel('2 Zucchini', label: 'Gemüse')],
+            'recipeReferences' => [],
+        ]);
+    });
+
+    Native::visit('/');
+
+    appNeuStarten();
+
+    $screen = Native::visit('/');
+
+    expect($waehrendDesZweitenLadens)->toBe(['1 Kopf Brokkoli']);
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['2 Zucchini']]]);
 });

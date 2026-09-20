@@ -1,10 +1,14 @@
 @use('App\Icons\Android')
 @use('App\Icons\Ios')
 
+@php($banner = $this->banner())
+
 <native:column class="w-full h-full bg-theme-background">
-    {{-- Direkt unter der Top-Bar: entweder die Einladung, Mealie zu verbinden,
-         oder — nur beim ersten Laden einer Sitzung — der Hinweis, dass noch
-         etwas unterwegs ist. Jedes weitere Laden bleibt stumm. --}}
+    {{-- Direkt unter der Top-Bar: die Einladung, Mealie zu verbinden, das
+         Fehlerbanner oder — nur beim ersten Laden einer Sitzung — der
+         Hinweis, dass noch etwas unterwegs ist. Jedes weitere Laden bleibt
+         stumm, und das Banner bleibt während eines Neuversuchs stehen,
+         statt hin und her zu springen. --}}
     @if ($this->mealieNichtVerbunden)
         <native:row class="w-full items-center gap-2 bg-theme-surface px-4 py-2">
             <native:icon :ios="Ios::InfoCircle" :android="Android::Info" :size="20" a11y-label="Hinweis" class="text-theme-on-surface-variant" />
@@ -16,6 +20,31 @@
                 label="Einstellungen"
                 @press="oeffneEinstellungen"
             />
+        </native:row>
+    @elseif ($banner !== null)
+        <native:row class="w-full items-center gap-2 bg-theme-surface px-4 py-2">
+            <native:icon :ios="Ios::ExclamationmarkTriangle" :android="Android::Warning" :size="20" a11y-label="Warnung" class="text-theme-accent" />
+            <native:text class="flex-1 text-sm text-theme-on-surface-variant">{{ $banner->text() }}</native:text>
+            {{-- Zwei Knöpfe statt einem mit bedingtem Handler: ein `@if` in
+                 der Attributliste eines `native:`-Tags zerlegt der
+                 Precompiler. --}}
+            @if ($banner->tokenUngueltig())
+                <native:button
+                    ref="mealie-banner-aktion"
+                    size="sm"
+                    variant="secondary"
+                    label="{{ $banner->aktion() }}"
+                    @press="oeffneEinstellungen"
+                />
+            @else
+                <native:button
+                    ref="mealie-banner-aktion"
+                    size="sm"
+                    variant="secondary"
+                    label="{{ $banner->aktion() }}"
+                    @press="neuLaden"
+                />
+            @endif
         </native:row>
     @elseif ($this->mealieLaedt)
         <native:row class="w-full items-center gap-2 bg-theme-surface px-4 py-2">
@@ -54,6 +83,7 @@
                                 headline="{{ $zeile->text }}"
                                 :supporting="$zeile->zusatz ?? ''"
                                 :leadingCheckbox="false"
+                                :disabled="$banner !== null"
                                 :trailingIconIos="Ios::ForkKnife"
                                 :trailingIconAndroid="Android::Restaurant"
                                 trailing-a11y-label="aus Mealie"
@@ -103,6 +133,7 @@
                             ref="abgehakt-{{ $zeile->id }}"
                             headline="{{ $zeile->text }}"
                             :leadingCheckbox="true"
+                            :disabled="$banner !== null"
                             :headlineColor="theme('on-surface-variant', '#475569')"
                             @press="{{ $umschalten }}"
                         />

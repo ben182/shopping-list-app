@@ -145,19 +145,20 @@ Prefix: `EKL`.
 - [x] Eigene Artikel erscheinen nie im Abschnitt „Abgehakt“; sie werden weiterhin durch Tap in den Vorrat zurückgeschickt.
 
 ### EKL-009: Mealie-Cache und Fehlerzustand auf dem Einkaufen-Screen
+**Status:** done
 **Priority:** 9
 **Blocked by:** EKL-008
 **Description:** Als Nutzer möchte ich meine Mealie-Artikel auch sehen, wenn Mealie gerade nicht erreichbar ist (z. B. im Supermarkt-Keller), damit die Übersicht beim Einkaufen nicht plötzlich schrumpft.
 
 **Acceptance Criteria:**
-- [ ] Jede erfolgreich geladene Mealie-Liste wird lokal (SQLite) mit Zeitstempel gespeichert und ersetzt den vorherigen Cache. Der Cache überlebt App-Neustarts.
-- [ ] Beim Öffnen des Einkaufen-Tabs werden die gecachten Mealie-Artikel sofort angezeigt, noch bevor die Antwort des Neuladens da ist; die Antwort ersetzt sie dann ohne sichtbares Flackern.
-- [ ] Schlägt das Laden fehl (Netzwerkfehler, Timeout, HTTP 5xx), bleiben die gecachten Artikel sichtbar und direkt unter der Top-Bar erscheint ein Banner mit Warn-Icon und dem Text „Mealie nicht erreichbar · Stand HH:MM“ (Zeit des letzten erfolgreichen Ladens; bei anderem Tag „Stand DD.MM. HH:MM“). Das Banner enthält einen Text-Button „Erneut versuchen“.
-- [ ] Antwortet Mealie mit HTTP 401, lautet der Banner-Text „Mealie-Token ungültig“ mit Text-Button „Einstellungen“.
-- [ ] Solange das Banner sichtbar ist, sind Mealie-Zeilen tappbar-deaktiviert (Checkbox ausgegraut, `disabled`), ein Tap zeigt den Toast „Offline: Mealie-Artikel können gerade nicht geändert werden“; eigene Artikel bleiben voll bedienbar.
-- [ ] Ein erfolgreiches Neuladen (Pull-to-Refresh, „Erneut versuchen“, Rückkehr in den Vordergrund) entfernt das Banner und aktiviert die Mealie-Zeilen wieder.
-- [ ] Schlägt das Laden fehl und es gibt keinen Cache, erscheint nur das Banner; die Liste zeigt eigene Artikel bzw. den Leerzustand.
-- [ ] Löschen des Tokens in den Einstellungen löscht auch den Mealie-Cache; der Einkaufen-Screen zeigt danach nur eigene Artikel und die Hinweiszeile „Mealie nicht verbunden“.
+- [x] Jede erfolgreich geladene Mealie-Liste wird lokal (SQLite) mit Zeitstempel gespeichert und ersetzt den vorherigen Cache. Der Cache überlebt App-Neustarts.
+- [x] Beim Öffnen des Einkaufen-Tabs werden die gecachten Mealie-Artikel sofort angezeigt, noch bevor die Antwort des Neuladens da ist; die Antwort ersetzt sie dann ohne sichtbares Flackern.
+- [x] Schlägt das Laden fehl (Netzwerkfehler, Timeout, HTTP 5xx), bleiben die gecachten Artikel sichtbar und direkt unter der Top-Bar erscheint ein Banner mit Warn-Icon und dem Text „Mealie nicht erreichbar · Stand HH:MM“ (Zeit des letzten erfolgreichen Ladens; bei anderem Tag „Stand DD.MM. HH:MM“). Das Banner enthält einen Text-Button „Erneut versuchen“.
+- [x] Antwortet Mealie mit HTTP 401, lautet der Banner-Text „Mealie-Token ungültig“ mit Text-Button „Einstellungen“.
+- [x] Solange das Banner sichtbar ist, sind Mealie-Zeilen tappbar-deaktiviert (Checkbox ausgegraut, `disabled`), ein Tap zeigt den Toast „Offline: Mealie-Artikel können gerade nicht geändert werden“; eigene Artikel bleiben voll bedienbar.
+- [x] Ein erfolgreiches Neuladen (Pull-to-Refresh, „Erneut versuchen“, Rückkehr in den Vordergrund) entfernt das Banner und aktiviert die Mealie-Zeilen wieder.
+- [x] Schlägt das Laden fehl und es gibt keinen Cache, erscheint nur das Banner; die Liste zeigt eigene Artikel bzw. den Leerzustand.
+- [x] Löschen des Tokens in den Einstellungen löscht auch den Mealie-Cache; der Einkaufen-Screen zeigt danach nur eigene Artikel und die Hinweiszeile „Mealie nicht verbunden“.
 
 ### EKL-010: „Alles abhaken“ inklusive Mealie-Artikel
 **Priority:** 10

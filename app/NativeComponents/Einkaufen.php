@@ -10,6 +10,8 @@ use App\Icons\Ios;
 use App\Liste\EigeneListe;
 use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
+use App\Mealie\Fehler;
+use App\Mealie\Fehlerzustand;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
 use Ben182\AppLifecycle\Events\AppForegrounded;
@@ -68,7 +70,16 @@ class Einkaufen extends NativeComponent
         $this->mealieLaden();
     }
 
-    /** Pull-to-Refresh an der Liste. */
+    /**
+     * Was das Banner unter der Top-Bar sagt — `null`, solange Mealie
+     * mitspielt. Solange es etwas sagt, sind die Mealie-Zeilen gesperrt.
+     */
+    public function banner(): ?Fehlerzustand
+    {
+        return app(Sitzung::class)->fehlerzustand();
+    }
+
+    /** Pull-to-Refresh an der Liste, und der Knopf im Banner. */
     public function neuLaden(): void
     {
         $this->mealieLaden();
@@ -158,6 +169,12 @@ class Einkaufen extends NativeComponent
      */
     public function mealieUmschalten(string $artikelId): void
     {
+        if ($this->banner() !== null) {
+            Dialog::toast('Offline: Mealie-Artikel können gerade nicht geändert werden');
+
+            return;
+        }
+
         $eintrag = app(Sitzung::class)->finden($artikelId);
 
         if ($eintrag === null) {
@@ -255,6 +272,14 @@ class Einkaufen extends NativeComponent
 
         $this->mealieNichtVerbunden = $ergebnis->status === SecureStorageStatus::NotFound;
 
+        if ($this->mealieNichtVerbunden) {
+            // Kein Token mehr: was aus Mealie kam, hat auf dem Screen nichts
+            // mehr verloren — auch nicht aus dem Cache.
+            app(Sitzung::class)->vergessen();
+
+            $this->listeNeuZeichnen();
+        }
+
         if (! $ergebnis->found()) {
             return;
         }
@@ -273,12 +298,18 @@ class Einkaufen extends NativeComponent
 
                 if (isset($ergebnis['artikel'])) {
                     app(Sitzung::class)->setzen($ergebnis['artikel']);
+                } else {
+                    app(Sitzung::class)->fehlerMelden(Fehler::ausSchluessel((string) ($ergebnis['fehler'] ?? '')));
                 }
 
                 $this->listeNeuZeichnen();
             })
             ->failed(function (): void {
                 $this->mealieLaedt = false;
+
+                app(Sitzung::class)->fehlerMelden(Fehler::Netz);
+
+                $this->listeNeuZeichnen();
             });
     }
 
