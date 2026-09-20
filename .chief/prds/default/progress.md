@@ -110,6 +110,23 @@
   Erwartungen mit `?? false` schreiben.
 - **Mealie-Konfiguration** in `config/mealie.php` (`url`, `shopping_list_id`,
   `timeout`), das Token ausschließlich über `App\Mealie\Token`.
+- **Mealie-Daten:** Laden/Parsen in `App\Mealie\Einkaufsliste` (statisch,
+  serialisierbar für `async`), Sitzungszustand im Singleton `App\Mealie\Sitzung`,
+  Label→Gruppe über `App\Mealie\Gruppenzuordnung` (`config/mealie.php`:
+  `label_aliase`, `gruppe_ohne_label`). Das Zusammenlegen mit den eigenen
+  Artikeln macht `App\Einkaufen\Uebersicht` (`abschnitte()`, `anzahl()`).
+- **Screen-Lebenszyklus:** `mount()` beim Öffnen/Tab-Wechsel, `onResume()` beim
+  Zurückkehren von einem gepushten Screen (im Test `->follow()` … `->goBack()`).
+  Der App-Vordergrund kommt nicht aus dem Framework, sondern aus dem lokalen
+  Plugin `ben182/app-lifecycle` als `#[On(AppForegrounded::class)]`.
+- **Zustand über Screenwechsel hinweg** gehört in ein Singleton aus
+  `AppServiceProvider::register()` — Komponenten werden bei jedem Tab-Wechsel
+  neu gemountet.
+- **Kein `@if` innerhalb der Attributliste eines `native:`-Tags** (ParseError);
+  bedingte Attribute als `:attr="$wert ?? ''"`. `native:button` braucht
+  `label="…"` statt Slot-Inhalt.
+- **`Http::fake()` zweimal aufrufen ersetzt nichts** — für aufeinanderfolgende
+  Antworten `Http::fakeSequence('<muster>')->push(…)`.
 
 ---
 
@@ -510,3 +527,116 @@ mobile-ui-Tag, das der Core-Analyzer nicht kennt. Keine andere Fehlerart.
   sich serialisieren lassen.
 ---
 <!-- chief-timing story="EKL-006" duration_ms=885065 cost=38.459031 in=348 out=1202 cache_create=761202 cache_read=16060749 -->
+
+## 2026-09-20 - EKL-007
+
+Der Einkaufen-Screen zeigt jetzt eigene Artikel und offene Mealie-Artikel in
+einer Liste. Geladen wird beim Mount, bei `onResume()` (Rückkehr von den
+Einstellungen), bei Pull-to-Refresh (`on-refresh="neuLaden"`) und auf das
+Native-Event `App\Events\AppImVordergrund` — alles über `async`, damit der
+Runloop nicht hängt. Label-Zuordnung: exakter Gruppenname → Alias-Tabelle
+(`config/mealie.php`, Anhang B) → eigene Gruppe; ohne Label „Sonstiges“.
+Katalog-Gruppen zuerst in Katalogreihenfolge, Label-Gruppen danach
+alphabetisch (Umlaute auf Grundbuchstaben normalisiert). Innerhalb einer
+Gruppe eigene Artikel zuerst, dann Mealie nach `position`, dann `createdAt`.
+
+**Dateien**
+
+- `config/mealie.php` — `label_aliase`, `gruppe_ohne_label`
+- `app/Mealie/Einkaufsliste.php` — statischer Loader + Parser (inkl.
+  Rezeptnamen aus `recipeReferences`, Nachladen über `/api/recipes/{id}`)
+- `app/Mealie/Eintrag.php`, `app/Mealie/Sitzung.php` (Singleton),
+  `app/Mealie/Gruppenzuordnung.php`
+- `app/Einkaufen/{Zeile,Abschnitt,Uebersicht}.php` — das Zusammenlegen
+- `app/Events/AppImVordergrund.php`
+- `app/Providers/AppServiceProvider.php` — `Sitzung` als Singleton
+- `app/NativeComponents/Einkaufen.php`, `resources/views/native/einkaufen.blade.php`
+- `tests/Feature/EinkaufenMealieTest.php` — 31 Tests
+
+113 Tests, 699 Assertions, grün. Pint sauber. `native:validate` rot mit 9
+„Unknown native element type“-Meldungen (eine mehr als nach EKL-006: die
+zweite `list-item`-Variante im Einkaufen-Blade), keine andere Fehlerart, keine
+Warnungen.
+
+**Zweites Plugin: `plugins/app-lifecycle`**
+
+NativePHP Mobile 4.5 brückt den App-Lebenszyklus nicht nach PHP — in
+`Events/App/` liegt allein `UpdateInstalled`, `NativePHPLifecycle.ON_RESUME`
+(Kotlin) und `NativePHP.didBecomeActive` (Swift) bleiben auf der Geräteseite.
+Für den Trigger „App kehrt in den Vordergrund zurück“ gibt es deshalb ein
+zweites lokales Plugin, `ben182/app-lifecycle` (Namespace `Ben182\AppLifecycle`,
+Kotlin-Package `de.ben182.applifecycle`). Es hat **keine Bridge-Funktion**,
+sondern nur eine **Init-Funktion** (`android.init_function` /
+`ios.init_function` in `nativephp.json`): die wird beim Start einmal
+aufgerufen, abonniert den Lebenszyklus und legt
+`Ben182\AppLifecycle\Events\AppForegrounded` über
+`NativeElementBridge.sendNativeEvent` in die Element-Event-Queue — derselbe
+Weg, den der eingebaute ShakeDetector für `ShakeDetected` nimmt. Der
+Einkaufen-Screen hört mit `#[On(AppForegrounded::class)]` darauf.
+
+`native:plugin:list` führt es auf, `native:plugin:validate` meldet dafür eine
+Warnung („No bridge_functions defined in manifest“) — erwartet für ein
+Init-only-Plugin, kein Fehler. **Die native Hälfte ist ungebaut und damit
+ungetestet** (wie die von `secure-storage`): Kotlin und Swift werden erst beim
+ersten `native:run` kompiliert.
+
+**Learnings für die nächsten Iterationen**
+
+- **`onResume()` ist der Hook für „der gepushte Screen ist weg“.** Der Router
+  (`NativeRouter.php:496-501`) mountet nur bei `$freshPush`; beim Pop läuft
+  `onResume()` auf dem darunterliegenden, **lebenden** Screen. Im Harness:
+  `$screen->press('oeffneEinstellungen')->follow()` … `->goBack()` — das feuert
+  `onResume()` und rendert neu. Damit ist „Token speichern und zurückkehren“
+  ein einziger durchgehender Test.
+- **`$this->async()` funktioniert schon in `mount()`** und läuft mit
+  `AsyncTask::fake()` inline durch, `finished()` inklusive. Der Screen ist nach
+  `Native::visit()` also bereits im Nach-Lade-Zustand.
+- **Ein zweites `Http::fake()` ersetzt das erste nicht** — die neue Regel landet
+  *hinter* der alten, und die alte trifft weiter zuerst. Für „erst A, dann B“
+  gibt es `Http::fakeSequence('<muster>')->push(…)->push(…)`.
+- **Zustand, der den Screenwechsel überleben soll, gehört in ein Singleton**
+  (`AppServiceProvider::register()`), nicht in eine Property: jeder Tab-Wechsel
+  mountet den Root-Screen neu. Im Test überlebt das Singleton genau einen Test,
+  also verhält sich „zweiter `Native::visit()` im selben Test“ wie ein
+  Tab-Wechsel auf dem Gerät — praktisch für „nur beim ersten Mal“-Regeln.
+- **„Nur beim ersten Ladevorgang“ lässt sich am Seam prüfen**, indem man den
+  Screen erst ohne Token besucht (kein Laden), dann das Token in den Fake-Store
+  schreibt und `neuLaden` auslöst: Jetzt existiert der Harness *während* des
+  ersten Ladevorgangs, und `$screen->get('…')` aus einem `Http::fake()`-Callback
+  heraus sieht den Zwischenzustand.
+- **Blade: kein `@if` innerhalb der Attributliste eines `native:`-Tags.** Der
+  Precompiler zerlegt das Tag und der Rumpf landet als `<?php else: ?>` ohne
+  `if` → ParseError. Bedingte Attribute als `:attr="$wert ?? ''"` schreiben oder
+  das ganze Tag doppeln.
+- **`native:button` braucht `label="…"`**, keinen Slot-Inhalt — sonst warnt
+  `native:validate` („without 'label' attribute“) und das Label fehlt.
+- **Trailing-Icon am `list-item`:** `:trailingIconIos` / `:trailingIconAndroid`
+  (camelCase, kebab wird für diese nicht übersetzt), dazu
+  `trailing-a11y-label="…"` → Props `trailing_icon`, `trailing_a11y_label`.
+  Keine Farbe setzen: `ListItemDefaults` zeichnet Trailing-Icons ohnehin in
+  `onSurfaceVariant`, und `trailingIconColor` nimmt nur feste Hex-Werte ohne
+  Dark-Mode-Entsprechung.
+- **Mealies Listen-Antwort trägt die Rezeptnamen schon mit**: oben auf der
+  Liste steht `recipeReferences[].recipe.name`, am Artikel nur `recipeId`. Die
+  Zuordnung läuft über diese Tabelle; nur was dort fehlt, wird einzeln über
+  `/api/recipes/{id}` nachgeladen. In der echten Instanz war das nie nötig.
+- **Echte Zahlen der Instanz** (Stand 2026-09-20): 62 Artikel auf der Liste,
+  davon 9 offen; Labels `Gemüse, Obst, Backwaren, Milchprodukte, Konserven,
+  Gewürze, Würzmittel, Getreide, Snacks, Getränke, Obst & Gemüse, Sonstiges` —
+  alle bis auf „Obst & Gemüse“, „Getränke“ und „Sonstiges“ laufen über die
+  Alias-Tabelle. `position` ist bei allen 0, die Reihenfolge entscheidet also
+  `createdAt`.
+- **Ein Plugin ohne Bridge-Funktion ist möglich und oft das Richtige**, wenn es
+  nur *von* der Geräteseite *nach* PHP melden soll: `bridge_functions: []` plus
+  `android.init_function` (Top-Level-Kotlin-Funktion, bekommt `context`) und
+  `ios.init_function` (Swift-Funktion ohne Argumente). Beide werden aus
+  `PluginBridgeFunctionRegistration` heraus einmal beim Start aufgerufen. Ein
+  eigener Wächter gegen Doppelanmeldung gehört dazu — eine neu erzeugte
+  Activity ruft die Init-Funktion erneut auf.
+- **Der Weg Gerät → PHP heißt `NativeElementBridge.sendNativeEvent(name, json)`**
+  (Kotlin) bzw. `LaravelBridge.shared.send?(name, [:])` (Swift). Als `name`
+  reicht der voll qualifizierte PHP-Klassenname; `#[On(Klasse::class)]` findet
+  ihn mit und ohne `native:`-Präfix.
+- Für EKL-008/010: Mealie-Zeilen haben schon `ref="mealie-<itemId>"` und
+  tragen die Mealie-Artikel-ID; `Sitzung::alle()` liefert auch die abgehakten.
+<!-- chief-timing story="EKL-007" duration_ms=1121031 cost=69.944824 in=538 out=2271 cache_create=766285 cache_read=36932390 -->

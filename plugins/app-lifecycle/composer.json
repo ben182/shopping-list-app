@@ -1,0 +1,25 @@
+{
+    "name": "ben182/app-lifecycle",
+    "description": "Delivers the native app lifecycle (foreground) to PHP as a NativePHP Mobile event",
+    "type": "nativephp-plugin",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "nativephp/mobile": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ben182\\AppLifecycle\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Ben182\\AppLifecycle\\AppLifecycleServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    }
+}

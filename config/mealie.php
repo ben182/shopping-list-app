@@ -32,4 +32,46 @@ return [
 
     'timeout' => 10,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Label-Aliase
+    |--------------------------------------------------------------------------
+    |
+    | Mealie-Labels, die eine Katalog-Gruppe meinen, aber anders heißen
+    | (Anhang B der PRD). Labels, die exakt wie eine Katalog-Gruppe heißen,
+    | brauchen keinen Eintrag; alles, was hier fehlt, wird auf dem
+    | Einkaufen-Screen zu einer eigenen Gruppe mit dem Label als Überschrift.
+    |
+    | Gepflegt wird die Tabelle im Code — eine UI dafür gibt es bewusst nicht.
+    |
+    */
+
+    'label_aliase' => [
+        'Gemüse' => 'Obst & Gemüse',
+        'Obst' => 'Obst & Gemüse',
+        'Bio-Lebensmittel' => 'Obst & Gemüse',
+        'Backwaren' => 'Brot & Backwaren',
+        'Konditorwaren' => 'Brot & Backwaren',
+        'Milchprodukte' => 'Kühlregal',
+        'Fleischprodukte' => 'Kühlregal',
+        'Fleisch' => 'Kühlregal',
+        'Meeresfrüchte' => 'Kühlregal',
+        'Tiefkühlware' => 'Tiefkühl',
+        'Getreide' => 'Lebensmittel',
+        'Konserven' => 'Lebensmittel',
+        'Gewürze' => 'Lebensmittel',
+        'Würzmittel' => 'Lebensmittel',
+        'Snacks' => 'Lebensmittel',
+        'Süßwaren' => 'Lebensmittel',
+        'Alkohol' => 'Getränke',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Gruppe für Artikel ohne Label
+    |--------------------------------------------------------------------------
+    */
+
+    'gruppe_ohne_label' => 'Sonstiges',
+
 ];

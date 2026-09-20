@@ -1,0 +1,24 @@
+{
+    "namespace": "AppLifecycle",
+    "bridge_functions": [],
+    "android": {
+        "min_version": 29,
+        "init_function": "de.ben182.applifecycle.initAppLifecycle",
+        "permissions": [],
+        "dependencies": {
+            "implementation": []
+        }
+    },
+    "ios": {
+        "min_version": "18.0",
+        "init_function": "initAppLifecycle",
+        "info_plist": {},
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+    "events": [
+        "Ben182\\AppLifecycle\\Events\\AppForegrounded"
+    ]
+}

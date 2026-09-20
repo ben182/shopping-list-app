@@ -113,20 +113,21 @@ Prefix: `EKL`.
 - [x] Im Testkontext (ohne native Bridge) meldet der Screen „Fehler beim Lesen: BRIDGE_UNAVAILABLE“ statt abzustürzen.
 
 ### EKL-007: Offene Mealie-Artikel in der Einkaufs-Übersicht anzeigen
+**Status:** done
 **Priority:** 7
 **Blocked by:** EKL-003, EKL-006
 **Description:** Als Nutzer möchte ich die offenen Artikel meiner Mealie-Einkaufsliste zusammen mit meinen eigenen Artikeln in einer nach Warengruppen gruppierten Liste sehen, damit ich einmal durch den Laden laufe.
 
 **Acceptance Criteria:**
-- [ ] Beim Öffnen des Einkaufen-Tabs, beim Zurückkehren der App in den Vordergrund und per Pull-to-Refresh (`native:list` mit `on-refresh`) lädt die App die Mealie-Liste mit der konfigurierten Listen-ID (`GET /api/households/shopping/lists/{id}`, Bearer-Token aus dem Secure Storage, Timeout 10 s).
-- [ ] Eigene Artikel sind sofort sichtbar; während des ersten Ladevorgangs einer Sitzung erscheint direkt unter der Top-Bar eine kleine Zeile mit `native:activity-indicator` und dem Text „Mealie wird geladen…“. Weitere Ladevorgänge zeigen keine Zeile (Pull-to-Refresh zeigt den nativen Spinner).
-- [ ] Nicht abgehakte Mealie-Artikel werden in die Gruppen einsortiert. Zuordnung eines Mealie-Labels zu einer Gruppe, in dieser Reihenfolge: (1) Label-Name ist exakt gleich einem Katalog-Gruppennamen → diese Gruppe; (2) Label-Name steht in der Alias-Tabelle aus Anhang B → die dort genannte Gruppe; (3) sonst → eine eigene Gruppe mit dem Label-Namen als Überschrift. Artikel ohne Label → Gruppe „Sonstiges“.
-- [ ] Die 8 Katalog-Gruppen erscheinen zuerst in Katalogreihenfolge; danach folgen die zusätzlichen Label-Gruppen alphabetisch. Leere Gruppen sind ausgeblendet.
-- [ ] Innerhalb einer Gruppe stehen eigene Artikel zuerst in Katalogreihenfolge, danach Mealie-Artikel in der Reihenfolge, die Mealie liefert (Feld `position`, dann Erstellzeitpunkt).
-- [ ] Eine Mealie-Zeile ist eine `native:list-item`-Zeile mit leerer Leading-Checkbox, Mealies `display`-Text als Headline (z. B. „400 g mehligkochende Kartoffeln“), dem Rezeptnamen als Supporting-Text, wenn der Artikel mindestens einen Rezeptbezug hat (bei mehreren: durch „ · “ getrennt), und einem dezenten Trailing-Icon in gedämpfter Farbe (Besteck-/Restaurant-Icon) mit `a11y-label` „aus Mealie“. Eigene Zeilen haben kein Trailing-Icon.
-- [ ] Der Untertitel „n Artikel“ zählt eigene plus offene Mealie-Artikel. Der Leerzustand aus EKL-003 erscheint nur, wenn weder eigene noch offene Mealie-Artikel vorhanden sind.
-- [ ] Ist kein Token hinterlegt, erscheint direkt unter der Top-Bar eine Hinweiszeile mit Info-Icon, dem Text „Mealie nicht verbunden“ und einem Text-Button „Einstellungen“, der den Einstellungen-Screen öffnet. Eigene Artikel werden normal angezeigt; kein Mealie-Aufruf findet statt.
-- [ ] Nach dem Speichern eines Tokens in den Einstellungen und Zurückkehren lädt der Einkaufen-Screen die Mealie-Liste ohne weiteres Zutun.
+- [x] Beim Öffnen des Einkaufen-Tabs, beim Zurückkehren der App in den Vordergrund und per Pull-to-Refresh (`native:list` mit `on-refresh`) lädt die App die Mealie-Liste mit der konfigurierten Listen-ID (`GET /api/households/shopping/lists/{id}`, Bearer-Token aus dem Secure Storage, Timeout 10 s).
+- [x] Eigene Artikel sind sofort sichtbar; während des ersten Ladevorgangs einer Sitzung erscheint direkt unter der Top-Bar eine kleine Zeile mit `native:activity-indicator` und dem Text „Mealie wird geladen…“. Weitere Ladevorgänge zeigen keine Zeile (Pull-to-Refresh zeigt den nativen Spinner).
+- [x] Nicht abgehakte Mealie-Artikel werden in die Gruppen einsortiert. Zuordnung eines Mealie-Labels zu einer Gruppe, in dieser Reihenfolge: (1) Label-Name ist exakt gleich einem Katalog-Gruppennamen → diese Gruppe; (2) Label-Name steht in der Alias-Tabelle aus Anhang B → die dort genannte Gruppe; (3) sonst → eine eigene Gruppe mit dem Label-Namen als Überschrift. Artikel ohne Label → Gruppe „Sonstiges“.
+- [x] Die 8 Katalog-Gruppen erscheinen zuerst in Katalogreihenfolge; danach folgen die zusätzlichen Label-Gruppen alphabetisch. Leere Gruppen sind ausgeblendet.
+- [x] Innerhalb einer Gruppe stehen eigene Artikel zuerst in Katalogreihenfolge, danach Mealie-Artikel in der Reihenfolge, die Mealie liefert (Feld `position`, dann Erstellzeitpunkt).
+- [x] Eine Mealie-Zeile ist eine `native:list-item`-Zeile mit leerer Leading-Checkbox, Mealies `display`-Text als Headline (z. B. „400 g mehligkochende Kartoffeln“), dem Rezeptnamen als Supporting-Text, wenn der Artikel mindestens einen Rezeptbezug hat (bei mehreren: durch „ · “ getrennt), und einem dezenten Trailing-Icon in gedämpfter Farbe (Besteck-/Restaurant-Icon) mit `a11y-label` „aus Mealie“. Eigene Zeilen haben kein Trailing-Icon.
+- [x] Der Untertitel „n Artikel“ zählt eigene plus offene Mealie-Artikel. Der Leerzustand aus EKL-003 erscheint nur, wenn weder eigene noch offene Mealie-Artikel vorhanden sind.
+- [x] Ist kein Token hinterlegt, erscheint direkt unter der Top-Bar eine Hinweiszeile mit Info-Icon, dem Text „Mealie nicht verbunden“ und einem Text-Button „Einstellungen“, der den Einstellungen-Screen öffnet. Eigene Artikel werden normal angezeigt; kein Mealie-Aufruf findet statt.
+- [x] Nach dem Speichern eines Tokens in den Einstellungen und Zurückkehren lädt der Einkaufen-Screen die Mealie-Liste ohne weiteres Zutun.
 
 ### EKL-008: Mealie-Artikel abhaken und zurückholen
 **Priority:** 8

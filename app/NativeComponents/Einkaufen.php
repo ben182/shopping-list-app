@@ -2,35 +2,85 @@
 
 namespace App\NativeComponents;
 
+use App\Einkaufen\Abschnitt;
+use App\Einkaufen\Uebersicht;
 use App\Icons\Android;
 use App\Icons\Ios;
-use App\Katalog\Gruppe;
-use App\Katalog\Katalog;
 use App\Liste\EigeneListe;
+use App\Mealie\Einkaufsliste;
+use App\Mealie\Sitzung;
+use App\Mealie\Token;
+use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Attributes\Computed;
+use Native\Mobile\Attributes\On;
 use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\Layouts\Builders\NavAction;
 use Native\Mobile\Edge\Layouts\Builders\NavBarOptions;
 use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Facades\Dialog;
+use Native\Mobile\SecureStorageStatus;
 
 class Einkaufen extends NativeComponent
 {
+    /**
+     * Läuft gerade der erste Mealie-Ladevorgang dieser Sitzung? Nur der
+     * bekommt eine sichtbare Zeile; jeder weitere läuft still.
+     */
+    public bool $mealieLaedt = false;
+
+    /** Ist gar kein Token hinterlegt? Dann statt Mealie eine Hinweiszeile. */
+    public bool $mealieNichtVerbunden = false;
+
     public function navTitle(): string
     {
         return 'Einkaufen';
     }
 
     /**
-     * Die Anzahl der offenen Artikel auf diesem Screen. Solange es keine
-     * Mealie-Anbindung gibt, sind das nur die eigenen.
+     * Die Anzahl der offenen Artikel auf diesem Screen — eigene plus die
+     * nicht abgehakten aus Mealie.
      */
     public function navSubtitle(): ?string
     {
-        $anzahl = $this->liste()->anzahl();
+        $anzahl = $this->uebersicht()->anzahl();
 
         return $anzahl === 0 ? null : $anzahl.' Artikel';
+    }
+
+    /**
+     * Beim Öffnen des Tabs liegt die eigene Liste sofort da; Mealie kommt
+     * nach, sobald die Antwort da ist.
+     */
+    public function mount(): void
+    {
+        $this->mealieLaden();
+    }
+
+    /**
+     * Nach der Rückkehr von den Einstellungen — dort kann gerade erst ein
+     * Token gespeichert worden sein, das diesen Screen etwas angeht.
+     */
+    public function onResume(): void
+    {
+        $this->mealieLaden();
+    }
+
+    /** Pull-to-Refresh an der Liste. */
+    public function neuLaden(): void
+    {
+        $this->mealieLaden();
+    }
+
+    /**
+     * Die App kommt aus dem Hintergrund zurück — das Ereignis schickt das
+     * Plugin `ben182/app-lifecycle`. Der Screen tut dann dasselbe wie beim
+     * Öffnen des Tabs.
+     */
+    #[On(AppForegrounded::class)]
+    public function appImVordergrund(): void
+    {
+        $this->mealieLaden();
     }
 
     /**
@@ -60,22 +110,22 @@ class Einkaufen extends NativeComponent
     }
 
     /**
-     * Was auf der Liste steht — gruppiert und in Katalogreihenfolge, also
-     * genau wie im Vorrat.
+     * Was auf der Liste steht — eigene Artikel und offene Mealie-Artikel,
+     * gruppiert nach Warengruppe.
      *
-     * @return list<Gruppe>
+     * @return list<Abschnitt>
      */
     #[Computed]
-    public function gruppen(): array
+    public function abschnitte(): array
     {
-        return app(Katalog::class)->gruppiert($this->liste()->artikelIds());
+        return $this->uebersicht()->abschnitte();
     }
 
     public function abhaken(string $artikelId): void
     {
         $this->liste()->entfernen($artikelId);
 
-        unset($this->gruppen);
+        unset($this->abschnitte);
     }
 
     /**
@@ -108,7 +158,7 @@ class Einkaufen extends NativeComponent
 
             $this->liste()->alleEntfernen();
 
-            unset($this->gruppen);
+            unset($this->abschnitte);
         });
     }
 
@@ -122,8 +172,55 @@ class Einkaufen extends NativeComponent
         return $this->view('einkaufen');
     }
 
+    /**
+     * Holt die Mealie-Liste — aber nur, wenn ein Token da ist. „Gerät
+     * gesperrt“ und „Lesefehler“ sind ausdrücklich kein „kein Token“: dann
+     * wird weder geladen noch zum Verbinden aufgefordert.
+     *
+     * Der Aufruf läuft über `async`, weil der Runloop erst nach dem Handler
+     * wieder rendert — synchron bliebe die Ladezeile unsichtbar und die
+     * eigene Liste hinge, bis Mealie antwortet.
+     */
+    private function mealieLaden(): void
+    {
+        $ergebnis = app(Token::class)->lesen();
+
+        $this->mealieNichtVerbunden = $ergebnis->status === SecureStorageStatus::NotFound;
+
+        if (! $ergebnis->found()) {
+            return;
+        }
+
+        $this->mealieLaedt = app(Sitzung::class)->ersterLadevorgang();
+
+        $basisUrl = (string) config('mealie.url');
+        $token = (string) $ergebnis->value;
+        $listenId = (string) config('mealie.shopping_list_id');
+        $timeout = (int) config('mealie.timeout');
+
+        $this->async(static fn (): array => Einkaufsliste::laden($basisUrl, $token, $listenId, $timeout))
+            ->timeout($timeout + 5)
+            ->finished(function (array $ergebnis): void {
+                $this->mealieLaedt = false;
+
+                if (isset($ergebnis['artikel'])) {
+                    app(Sitzung::class)->setzen($ergebnis['artikel']);
+                }
+
+                unset($this->abschnitte);
+            })
+            ->failed(function (): void {
+                $this->mealieLaedt = false;
+            });
+    }
+
     private function liste(): EigeneListe
     {
         return app(EigeneListe::class);
+    }
+
+    private function uebersicht(): Uebersicht
+    {
+        return app(Uebersicht::class);
     }
 }
