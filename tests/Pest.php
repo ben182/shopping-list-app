@@ -51,7 +51,8 @@ function tabLabels(TestableComponent $screen): array
 /**
  * Alle Farbpaare, die der Baum ans Gerät schickt: pro Knoten die helle Farbe
  * und ihre dunkle Entsprechung — Hintergründe aus `style.bg_color` /
- * `props.dark_bg_color`, Text- und Icon-Farben aus `props.color` /
+ * `props.dark_bg_color`, Ränder aus `style.border_color` /
+ * `props.dark_border_color`, Text- und Icon-Farben aus `props.color` /
  * `props.dark_color`. Fehlt die dunkle Hälfte, hat jemand eine feste Farbe
  * statt einer Theme-Klasse benutzt.
  *
@@ -65,6 +66,11 @@ function farbPaare(array $tree): array
         $hintergrund = $node['style']['bg_color'] ?? null;
         if ($hintergrund !== null) {
             $paare[] = ['hell' => $hintergrund, 'dunkel' => $node['props']['dark_bg_color'] ?? null];
+        }
+
+        $rand = $node['style']['border_color'] ?? null;
+        if ($rand !== null) {
+            $paare[] = ['hell' => $rand, 'dunkel' => $node['props']['dark_border_color'] ?? null];
         }
 
         $vordergrund = $node['props']['color'] ?? null;
@@ -200,6 +206,17 @@ function knotenMitRef(TestableComponent $screen, string $ref): ?array
 }
 
 /**
+ * Die schwebende Leiste, die „Alles abhaken“ unten stehen lässt — `null`,
+ * solange es nichts rückgängig zu machen gibt.
+ *
+ * @return array<string, mixed>|null
+ */
+function rueckgaengigLeiste(TestableComponent $screen): ?array
+{
+    return knotenMitRef($screen, 'rueckgaengig-leiste');
+}
+
+/**
  * Ein Secure Storage, der sich merkt, was er bekommen hat: Schreiben füllt
  * ihn, Lesen gibt zurück, was zuletzt geschrieben wurde, Löschen leert ihn.
  * Ein `respondTo()` mit festem Array könnte das nicht — der Screen liest den
@@ -256,6 +273,18 @@ function jsonFixture(string $dateiname): array
  */
 function sichtbarerText(TestableComponent $screen): array
 {
+    return texteIn($screen->tree());
+}
+
+/**
+ * Dasselbe ab einem beliebigen Knoten — für „was steht in dieser Leiste“,
+ * wo der ganze Baum zu viel wäre.
+ *
+ * @param  array<string, mixed>  $node
+ * @return list<string>
+ */
+function texteIn(array $node): array
+{
     $texte = [];
 
     $walk = function (array $node) use (&$walk, &$texte): void {
@@ -272,7 +301,7 @@ function sichtbarerText(TestableComponent $screen): array
         }
     };
 
-    $walk($screen->tree());
+    $walk($node);
 
     return $texte;
 }

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Einkaufen\Rueckgaengig;
 use App\Mealie\Sitzung;
 use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Illuminate\Support\Facades\URL;
@@ -22,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
         // Dasselbe für den Wochenplan: eine geladene Woche soll beim
         // Tab-Wechsel nicht wieder hinter einem Spinner verschwinden.
         $this->app->singleton(Wochenplansitzung::class);
+
+        // Und für die Rücknahme von „Alles abhaken“: sie muss dem Screen
+        // gehören, nicht einem Aufruf — das Ergebnis des Bulk-Updates kommt
+        // erst nach dem Rendern zurück und greift dann noch auf sie zu.
+        $this->app->singleton(Rueckgaengig::class);
     }
 
     /**

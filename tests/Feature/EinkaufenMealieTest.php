@@ -10,7 +10,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\AsyncTask;
-use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Testing\Native;
 use Native\Mobile\Testing\TestableComponent;
 
@@ -1120,7 +1119,7 @@ it('hat die gecachten Artikel schon auf dem Schirm, während die neue Antwort no
  * Ab hier: „Alles abhaken“ inklusive Mealie (EKL-010).
  */
 
-it('nennt im Dialog eigene und Mealie-Artikel als je einen eigenen Satz', function () {
+it('zählt in der Leiste eigene und Mealie-Artikel zusammen', function () {
     eigeneArtikel('tofu', 'salz');
 
     mitMealie([
@@ -1129,44 +1128,32 @@ it('nennt im Dialog eigene und Mealie-Artikel als je einen eigenen Satz', functi
         mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true),
     ]);
 
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['title'] === 'Alles abhaken?'
-            && $params['message'] === '2 eigene Artikel wandern zurück in den Vorrat. 2 Mealie-Artikel werden abgehakt.');
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    $screen->assertNativeNotCalled('Dialog.Alert');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('4 Artikel abgehakt');
 });
 
-it('setzt im Dialog beide Zahlen in den Singular', function () {
-    eigeneArtikel('tofu');
-
-    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
-
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message']
-            === '1 eigener Artikel wandert zurück in den Vorrat. 1 Mealie-Artikel wird abgehakt.');
-});
-
-it('lässt den Mealie-Satz weg, wenn kein Mealie-Artikel mehr offen ist', function () {
+it('zählt in der Leiste nur die Artikel, die wirklich abgehakt wurden', function () {
     eigeneArtikel('tofu', 'salz');
 
     mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
 
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message']
-            === '2 eigene Artikel wandern zurück in den Vorrat.');
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('2 Artikel abgehakt');
 });
 
-it('lässt den eigenen Satz weg, wenn nur Mealie-Artikel offen sind', function () {
+it('zählt in der Leiste auch einen einzelnen Mealie-Artikel', function () {
     mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message']
-            === '1 Mealie-Artikel wird abgehakt.');
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
 });
 
-it('räumt nach „Abhaken“ die eigenen Artikel weg und hakt alle offenen Mealie-Artikel in einem Aufruf ab', function () {
+it('räumt ohne Nachfrage die eigenen Artikel weg und hakt alle offenen Mealie-Artikel in einem Aufruf ab', function () {
     eigeneArtikel('tofu', 'salz');
 
     mitMealie([
@@ -1175,9 +1162,7 @@ it('räumt nach „Abhaken“ die eigenen Artikel weg und hakt alle offenen Meal
         mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true, id: 'milch-1', position: 2),
     ]);
 
-    $screen = Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken']);
+    $screen = Native::visit('/')->press('alleAbhaken');
 
     expect(listenAbschnitte($screen))->toBe([]);
     expect(abgehaktZeilen($screen))->toBe(['Abgehakt (3)']);
@@ -1196,6 +1181,62 @@ it('räumt nach „Abhaken“ die eigenen Artikel weg und hakt alle offenen Meal
     expect($vorrat)->toContain('Tofu', 'Salz')->toHaveCount(112);
 });
 
+it('stellt die Leiste über den Block „Abgehakt“', function () {
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    $refs = array_map(fn (array $knoten) => $knoten['ref'], knotenMitRefPraefix($screen, ''));
+
+    expect(array_search('rueckgaengig-leiste', $refs, strict: true))
+        ->toBeLessThan(array_search('abgehakt-block', $refs, strict: true));
+});
+
+it('holt mit „Rückgängig“ die Mealie-Artikel per einem Bulk-Update zurück auf die Liste', function () {
+    eigeneArtikel('tofu');
+
+    mitMealie([
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1'),
+        mealieArtikel('2 Zucchini', label: 'Gemüse', id: 'zucchini-1', position: 1),
+    ]);
+
+    $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
+
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli', '2 Zucchini']],
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
+    ]);
+    expect(abgehaktZeilen($screen))->toBe([]);
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+
+    $zurueckgeholt = collect(Http::recorded())
+        ->map(fn (array $paar) => $paar[0])
+        ->filter(fn ($anfrage) => $anfrage->method() === 'PUT' && collect($anfrage->data())->pluck('checked')->all() === [false, false]);
+
+    expect($zurueckgeholt)->toHaveCount(1)
+        ->and(collect($zurueckgeholt->first()->data())->pluck('id')->all())->toBe(['brokkoli-1', 'zucchini-1']);
+});
+
+it('behält die eigenen Artikel zurückgeholt, wenn das Bulk-Update beim Rückgängigmachen scheitert', function () {
+    eigeneArtikel('tofu');
+
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+    // Das Abhaken darf durchgehen, erst das Zurückholen scheitert.
+    Http::fake(['*/api/households/shopping/items' => Http::sequence()
+        ->push([], 200)
+        ->push([], 500)]);
+    mealieAntwortet([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
+
+    $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Zurückholen fehlgeschlagen');
+});
+
 it('behält die eigenen Artikel entfernt und holt nur die Mealie-Artikel zurück, wenn das Bulk-Update scheitert', function () {
     eigeneArtikel('tofu');
 
@@ -1204,9 +1245,7 @@ it('behält die eigenen Artikel entfernt und holt nur die Mealie-Artikel zurück
         mealieArtikel('2 Zucchini', label: 'Gemüse', position: 1),
     ], aenderungsStatus: 500);
 
-    $screen = Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken']);
+    $screen = Native::visit('/')->press('alleAbhaken');
 
     expect(listenAbschnitte($screen))
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli', '2 Zucchini']]]);
@@ -1214,10 +1253,16 @@ it('behält die eigenen Artikel entfernt und holt nur die Mealie-Artikel zurück
 
     $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Abhaken fehlgeschlagen');
 
-    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
-        ->firstWhere('ueberschrift', 'Kühlregal')['artikel'];
+    // Die Leiste zählt jetzt nur noch den einen eigenen Artikel — die
+    // Mealie-Artikel stehen ja wieder offen da.
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
 
-    expect($vorrat)->toContain('Tofu');
+    $screen->press('rueckgaengigMachen');
+
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli', '2 Zucchini']],
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
+    ]);
 });
 
 it('holt die Mealie-Artikel auch zurück, wenn das Bulk-Update in einen Timeout läuft', function () {
@@ -1226,17 +1271,18 @@ it('holt die Mealie-Artikel auch zurück, wenn das Bulk-Update in einen Timeout 
     Http::fake(['*/api/households/shopping/items' => fn () => throw new ConnectionException('Zeitüberschreitung')]);
     mealieAntwortet([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
-    $screen = Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken']);
+    $screen = Native::visit('/')->press('alleAbhaken');
 
     expect(listenAbschnitte($screen))
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 
     $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Abhaken fehlgeschlagen');
+
+    // Nichts abgehakt, nichts zurückzunehmen.
+    expect(rueckgaengigLeiste($screen))->toBeNull();
 });
 
-it('nennt im Fehlerzustand nur die eigenen Artikel und hakt auch nur die ab', function () {
+it('hakt im Fehlerzustand nur die eigenen Artikel ab und zählt auch nur die', function () {
     eigeneArtikel('tofu', 'salz');
 
     $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
@@ -1245,16 +1291,27 @@ it('nennt im Fehlerzustand nur die eigenen Artikel und hakt auch nur die ab', fu
 
     $ausfall();
 
-    $screen->press('neuLaden')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message']
-            === '2 eigene Artikel wandern zurück in den Vorrat.')
-        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken']);
+    $screen->press('neuLaden')->press('alleAbhaken');
 
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('2 Artikel abgehakt');
     expect(listenAbschnitte($screen))
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 
     Http::assertNotSent(fn ($anfrage) => $anfrage->method() === 'PUT');
+});
+
+it('tut nichts, wenn im Fehlerzustand nur Mealie-Artikel offen sind', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/');
+
+    $ausfall();
+
+    $screen->press('neuLaden')->press('alleAbhaken');
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 });
 
 it('hakt ohne hinterlegtes Token nur die eigenen Artikel ab', function () {
@@ -1263,13 +1320,35 @@ it('hakt ohne hinterlegtes Token nur die eigenen Artikel ab', function () {
     AsyncTask::fake();
     fakeSecureStore();
 
-    $screen = Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message']
-            === '1 eigener Artikel wandert zurück in den Vorrat.')
-        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken']);
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
 
     $screen->assertSee('Liste ist leer.');
+});
+
+it('räumt die Leiste beim Tipp auf den Kopf des Abgehakt-Blocks ab', function () {
+    eigeneArtikel('tofu');
+
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
+
+    $screen = Native::visit('/')->press('alleAbhaken')->press('abgehakteUmklappen');
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+});
+
+it('räumt die Leiste beim Tipp auf eine Checkbox im Abgehakt-Block ab', function () {
+    eigeneArtikel('tofu');
+
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true, id: 'milch-1')]);
+
+    $screen = Native::visit('/')->press('abgehakteUmklappen')->press('alleAbhaken');
+
+    expect(rueckgaengigLeiste($screen))->not->toBeNull();
+
+    checkboxAntippen($screen, 'abgehakt-milch-1', false);
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
 });
 
 it('zeigt die Action „Alles abhaken“ auch dann, wenn nur ein Mealie-Artikel offen ist', function () {

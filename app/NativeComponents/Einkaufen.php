@@ -2,7 +2,9 @@
 
 namespace App\NativeComponents;
 
+use App\Einkaufen\Abhakvorgang;
 use App\Einkaufen\Abschnitt;
+use App\Einkaufen\Rueckgaengig;
 use App\Einkaufen\Uebersicht;
 use App\Einkaufen\Zeile;
 use App\Icons\Android;
@@ -19,7 +21,6 @@ use Native\Mobile\Attributes\Computed;
 use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\Layouts\Builders\NavAction;
 use Native\Mobile\Edge\Layouts\Builders\NavBarOptions;
-use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Facades\Dialog;
 use Native\Mobile\SecureStorageStatus;
 
@@ -56,6 +57,10 @@ class Einkaufen extends Screen
      */
     public function mount(): void
     {
+        // Ein Tab-Wechsel mountet diesen Screen neu — und räumt damit die
+        // Leiste ab, ohne dass der Tab-Wechsel selbst davon wissen muss.
+        $this->leisteVerwerfen();
+
         $this->mealieLaden();
     }
 
@@ -66,6 +71,15 @@ class Einkaufen extends Screen
     public function onResume(): void
     {
         $this->mealieLaden();
+    }
+
+    /**
+     * Die Leiste nach „Alles abhaken“ — `null`, solange es nichts
+     * zurückzunehmen gibt.
+     */
+    public function rueckgaengigVorgang(): ?Abhakvorgang
+    {
+        return app(Rueckgaengig::class)->vorgang();
     }
 
     /**
@@ -80,12 +94,16 @@ class Einkaufen extends Screen
     /** Pull-to-Refresh an der Liste, und der Knopf im Banner. */
     public function neuLaden(): void
     {
+        $this->leisteVerwerfen();
+
         $this->mealieLaden();
     }
 
     /** Zurück aus dem Hintergrund — dasselbe wie beim Öffnen des Tabs. */
     protected function wiederImVordergrund(): void
     {
+        $this->leisteVerwerfen();
+
         $this->mealieLaden();
     }
 
@@ -104,7 +122,7 @@ class Einkaufen extends Screen
                 NavAction::make('alles-abhaken')
                     ->icon(ios: Ios::CheckmarkCircle, android: Android::DoneAll)
                     ->a11yLabel('Alles abhaken')
-                    ->press('alleAbhakenBestaetigen')
+                    ->press('alleAbhaken')
             );
         }
 
@@ -157,11 +175,15 @@ class Einkaufen extends Screen
 
     public function abgehakteUmklappen(): void
     {
+        $this->leisteVerwerfen();
+
         app(Sitzung::class)->abgehakteUmklappen();
     }
 
     public function abhaken(string $artikelId): void
     {
+        $this->leisteVerwerfen();
+
         $this->liste()->entfernen($artikelId);
 
         unset($this->abschnitte);
@@ -174,6 +196,8 @@ class Einkaufen extends Screen
      */
     public function mealieUmschalten(string $artikelId): void
     {
+        $this->leisteVerwerfen();
+
         if ($this->banner() !== null) {
             Dialog::toast('Offline: Mealie-Artikel können gerade nicht geändert werden');
 
@@ -219,67 +243,64 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Zwei Taps bis zur leeren Liste: Der Dialog fragt nach, und erst sein
-     * „Abhaken“ räumt ab. Jeder andere Ausgang — „Abbrechen“, Wegtippen,
-     * Zurück-Geste — lässt die Liste stehen, weil dann entweder kein Event
-     * kommt oder eines mit einem anderen Label.
+     * Ein Tap, und die Liste ist leer: eigene Artikel zurück in den Vorrat,
+     * offene Mealie-Artikel abgehakt. Keine Nachfrage — der Fehlgriff kostet
+     * nichts, weil unten die Leiste stehen bleibt, die ihn zurücknimmt.
      */
-    public function alleAbhakenBestaetigen(): void
+    public function alleAbhaken(): void
     {
-        $eigene = $this->liste()->anzahl();
-        $mealie = count($this->mealieZumAbhaken());
+        $eigeneIds = $this->liste()->artikelIds();
+        $mealie = $this->mealieZumAbhaken();
 
-        if ($eigene === 0 && $mealie === 0) {
+        if ($eigeneIds === [] && $mealie === []) {
             return;
         }
 
-        Dialog::alert(
-            'Alles abhaken?',
-            $this->alleAbhakenFrage($eigene, $mealie),
-            [
-                ['label' => 'Abbrechen', 'style' => 'cancel'],
-                ['label' => 'Abhaken', 'style' => 'default'],
-            ]
-        )->buttonPressed(function (ButtonPressed $event): void {
-            if ($event->label !== 'Abhaken') {
-                return;
-            }
+        $this->liste()->alleEntfernen();
 
-            $this->liste()->alleEntfernen();
+        $vorgang = new Abhakvorgang($eigeneIds, array_map(fn (Eintrag $eintrag) => $eintrag->roh, $mealie));
 
-            $this->mealieAlleAbhaken();
+        app(Rueckgaengig::class)->merken($vorgang);
 
-            $this->listeNeuZeichnen();
-        });
+        $this->mealieAlleAbhaken($mealie, $vorgang);
+
+        $this->listeNeuZeichnen();
     }
 
     /**
-     * Der Dialogtext: ein Satz je Seite, und jeder nur, wenn er etwas zu
-     * sagen hat.
+     * Der Weg zurück: genau die Artikel dieses Vorgangs kommen wieder, die
+     * eigenen in ihre alten Warengruppen, die Mealie-Artikel in einem
+     * einzigen Bulk-Update auf „offen“.
      */
-    private function alleAbhakenFrage(int $eigene, int $mealie): string
+    public function rueckgaengigMachen(): void
     {
-        $saetze = [];
+        $vorgang = $this->rueckgaengigVorgang();
 
-        if ($eigene > 0) {
-            $saetze[] = $eigene === 1
-                ? '1 eigener Artikel wandert zurück in den Vorrat.'
-                : $eigene.' eigene Artikel wandern zurück in den Vorrat.';
+        if ($vorgang === null) {
+            return;
         }
 
-        if ($mealie > 0) {
-            $saetze[] = $mealie === 1
-                ? '1 Mealie-Artikel wird abgehakt.'
-                : $mealie.' Mealie-Artikel werden abgehakt.';
+        $this->leisteVerwerfen();
+
+        foreach ($vorgang->eigeneIds() as $artikelId) {
+            $this->liste()->hinzufuegen($artikelId);
         }
 
-        return implode(' ', $saetze);
+        $this->mealieZurueckholen($vorgang->mealieArtikel());
+
+        $this->listeNeuZeichnen();
+    }
+
+    /** Das Kreuz rechts in der Leiste. */
+    public function leisteSchliessen(): void
+    {
+        $this->leisteVerwerfen();
     }
 
     /**
      * Die offenen Mealie-Artikel, die „Alles abhaken“ mitnimmt. Leer, solange
      * das Banner steht oder kein Token hinterlegt ist: dann kann die App
-     * Mealie nichts melden und verspricht es im Dialog auch nicht.
+     * Mealie nichts melden und zählt es in der Leiste auch nicht mit.
      *
      * @return list<Eintrag>
      */
@@ -295,11 +316,12 @@ class Einkaufen extends Screen
     /**
      * Hakt alle offenen Mealie-Artikel in einem Zug ab: erst auf dem Screen,
      * dann — in einem einzigen Bulk-Update — in Mealie. Lehnt Mealie ab,
-     * kehren sie in ihre Gruppen zurück.
+     * kehren sie in ihre Gruppen zurück und fallen aus dem Vorgang heraus.
+     *
+     * @param  list<Eintrag>  $eintraege
      */
-    private function mealieAlleAbhaken(): void
+    private function mealieAlleAbhaken(array $eintraege, Abhakvorgang $vorgang): void
     {
-        $eintraege = $this->mealieZumAbhaken();
         $token = $this->mealieToken();
 
         if ($eintraege === [] || $token === null) {
@@ -316,36 +338,91 @@ class Einkaufen extends Screen
 
         $this->async(static fn (): array => Artikelstatus::alleSetzen($basisUrl, $token, $timeout, $artikel, true))
             ->timeout($timeout + 5)
-            ->finished(function (array $ergebnis) use ($ids): void {
+            ->finished(function (array $ergebnis) use ($ids, $vorgang): void {
                 if ($ergebnis['ok'] ?? false) {
                     return;
                 }
 
-                $this->mealieAbhakenZuruecknehmen($ids);
+                $this->mealieAbhakenZuruecknehmen($ids, $vorgang);
             })
-            ->failed(function () use ($ids): void {
-                $this->mealieAbhakenZuruecknehmen($ids);
+            ->failed(function () use ($ids, $vorgang): void {
+                $this->mealieAbhakenZuruecknehmen($ids, $vorgang);
             });
     }
 
     /**
      * Mealie hat das Bulk-Update nicht angenommen: die Artikel kehren in ihre
      * Gruppen zurück. Die eigenen Artikel bleiben entfernt — die hat Mealie
-     * nie etwas angegangen.
+     * nie etwas angegangen —, und die Leiste zählt nur noch sie.
      *
      * @param  list<string>  $ids
      */
-    private function mealieAbhakenZuruecknehmen(array $ids): void
+    private function mealieAbhakenZuruecknehmen(array $ids, Abhakvorgang $vorgang): void
     {
         app(Sitzung::class)->hakenMehrere($ids, false);
+
+        $vorgang->mealieVergessen();
 
         $this->listeNeuZeichnen();
 
         Dialog::toast('Mealie: Abhaken fehlgeschlagen');
     }
 
+    /**
+     * Setzt die Mealie-Artikel eines zurückgenommenen Vorgangs in einem Zug
+     * wieder auf „offen“. Ohne Token bleibt es bei den eigenen Artikeln —
+     * dann ist beim Abhaken ohnehin nichts an Mealie gegangen.
+     *
+     * @param  list<array<string, mixed>>  $artikel  Mealies Darstellung der Artikel
+     */
+    private function mealieZurueckholen(array $artikel): void
+    {
+        $token = $this->mealieToken();
+
+        if ($artikel === [] || $token === null) {
+            return;
+        }
+
+        $ids = array_map(fn (array $eintrag) => (string) ($eintrag['id'] ?? ''), $artikel);
+
+        app(Sitzung::class)->hakenMehrere($ids, false);
+
+        $basisUrl = (string) config('mealie.url');
+        $timeout = (int) config('mealie.timeout');
+
+        $this->async(static fn (): array => Artikelstatus::alleSetzen($basisUrl, $token, $timeout, $artikel, false))
+            ->timeout($timeout + 5)
+            ->finished(function (array $ergebnis) use ($ids): void {
+                if ($ergebnis['ok'] ?? false) {
+                    return;
+                }
+
+                $this->mealieZurueckholenZuruecknehmen($ids);
+            })
+            ->failed(function () use ($ids): void {
+                $this->mealieZurueckholenZuruecknehmen($ids);
+            });
+    }
+
+    /**
+     * Mealie hat das Zurückholen nicht angenommen: die Mealie-Artikel bleiben
+     * abgehakt. Die eigenen Artikel stehen trotzdem wieder auf der Liste.
+     *
+     * @param  list<string>  $ids
+     */
+    private function mealieZurueckholenZuruecknehmen(array $ids): void
+    {
+        app(Sitzung::class)->hakenMehrere($ids, true);
+
+        $this->listeNeuZeichnen();
+
+        Dialog::toast('Mealie: Zurückholen fehlgeschlagen');
+    }
+
     public function oeffneEinstellungen(): void
     {
+        $this->leisteVerwerfen();
+
         $this->navigate('/einstellungen');
     }
 
@@ -439,6 +516,12 @@ class Einkaufen extends Screen
     private function listeNeuZeichnen(): void
     {
         unset($this->abschnitte, $this->abgehakte, $this->rezepte);
+    }
+
+    /** Die erste Interaktion nach „Alles abhaken“ räumt die Leiste ab. */
+    private function leisteVerwerfen(): void
+    {
+        app(Rueckgaengig::class)->verwerfen();
     }
 
     private function liste(): EigeneListe

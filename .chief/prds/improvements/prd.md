@@ -65,20 +65,21 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Android-Systemdialoge (Alert-Buttons, Date-Picker) bleiben bewusst Indigo; das ist kein Fehler.
 
 ### FEIN-004: „Alles abhaken" mit Rückgängig statt Nachfrage
+**Status:** done
 **Priority:** 4
 **Description:** Als Nutzer möchte ich „Alles abhaken" ohne Nachfrage auslösen und es direkt danach rückgängig machen können, damit der Normalfall schnell ist und der Fehlgriff nichts kostet.
 
 **Acceptance Criteria:**
-- [ ] Ein Tipp auf „Alles abhaken" in der Navigationsleiste hakt sofort alle eigenen und alle offenen Mealie-Artikel ab; der bisherige Bestätigungsdialog erscheint nicht mehr.
-- [ ] Wie heute werden Mealie-Artikel nur einbezogen, wenn kein Banner steht und ein Token vorhanden ist; die Anzahl im Leistentext zählt nur die tatsächlich abgehakten Artikel.
-- [ ] Unmittelbar danach erscheint unten eine schwebende Leiste **oberhalb** des „Abgehakt"-Blocks bzw. der Tab-Leiste, wenn der Block fehlt. Inhalt: links der Text „12 Artikel abgehakt" (Singular „1 Artikel abgehakt"), rechts ein Textknopf „Rückgängig" in der Akzentfarbe, ganz rechts ein Schließen-Kreuz mit Accessibility-Label „Schließen".
-- [ ] Die Leiste hat den Hintergrund der Surface-Farbe, einen Rand in der Outline-Farbe und ist in Hell und Dunkel korrekt gefärbt (bestehender Theme-Test).
-- [ ] „Rückgängig" holt genau die Artikel dieses Vorgangs zurück: Eigene Artikel stehen wieder auf der Liste (in denselben Warengruppen wie vorher), Mealie-Artikel werden per einem Bulk-Update wieder auf „offen" gesetzt und wandern aus dem Abgehakt-Block zurück in die Liste.
-- [ ] Schlägt das Mealie-Bulk-Update beim Rückgängigmachen fehl, bleiben die eigenen Artikel trotzdem zurückgeholt, die Mealie-Artikel bleiben abgehakt, und es erscheint der Toast „Mealie: Zurückholen fehlgeschlagen".
-- [ ] Die Leiste verschwindet ohne Timer bei der ersten Interaktion auf dem Screen (Tipp auf eine Zeile, Checkbox, Abgehakt-Kopf, Pull-to-Refresh), beim Tab-Wechsel, beim Öffnen der Einstellungen, wenn die App in den Hintergrund geht, oder beim Tipp auf das Kreuz. Danach ist der Vorgang nicht mehr rückgängig zu machen.
-- [ ] Ein erneutes „Alles abhaken", während die Leiste steht, ersetzt sie durch eine neue Leiste für den neuen Vorgang; der alte Vorgang ist nicht mehr rückgängig zu machen.
-- [ ] Ist nichts abzuhaken, passiert beim Tipp nichts und es erscheint keine Leiste (die Aktion ist wie heute ohnehin nur sichtbar, wenn die Liste Artikel hat).
-- [ ] Der Fehlerfall des ursprünglichen Abhakens bleibt wie heute: Mealie-Artikel werden lokal zurückgerollt und der Toast „Mealie: Abhaken fehlgeschlagen" erscheint; die Leiste zeigt in diesem Fall nur die Anzahl der eigenen Artikel und ihr Rückgängig betrifft nur diese.
+- [x] Ein Tipp auf „Alles abhaken" in der Navigationsleiste hakt sofort alle eigenen und alle offenen Mealie-Artikel ab; der bisherige Bestätigungsdialog erscheint nicht mehr.
+- [x] Wie heute werden Mealie-Artikel nur einbezogen, wenn kein Banner steht und ein Token vorhanden ist; die Anzahl im Leistentext zählt nur die tatsächlich abgehakten Artikel.
+- [x] Unmittelbar danach erscheint unten eine schwebende Leiste **oberhalb** des „Abgehakt"-Blocks bzw. der Tab-Leiste, wenn der Block fehlt. Inhalt: links der Text „12 Artikel abgehakt" (Singular „1 Artikel abgehakt"), rechts ein Textknopf „Rückgängig" in der Akzentfarbe, ganz rechts ein Schließen-Kreuz mit Accessibility-Label „Schließen".
+- [x] Die Leiste hat den Hintergrund der Surface-Farbe, einen Rand in der Outline-Farbe und ist in Hell und Dunkel korrekt gefärbt (bestehender Theme-Test).
+- [x] „Rückgängig" holt genau die Artikel dieses Vorgangs zurück: Eigene Artikel stehen wieder auf der Liste (in denselben Warengruppen wie vorher), Mealie-Artikel werden per einem Bulk-Update wieder auf „offen" gesetzt und wandern aus dem Abgehakt-Block zurück in die Liste.
+- [x] Schlägt das Mealie-Bulk-Update beim Rückgängigmachen fehl, bleiben die eigenen Artikel trotzdem zurückgeholt, die Mealie-Artikel bleiben abgehakt, und es erscheint der Toast „Mealie: Zurückholen fehlgeschlagen".
+- [x] Die Leiste verschwindet ohne Timer bei der ersten Interaktion auf dem Screen (Tipp auf eine Zeile, Checkbox, Abgehakt-Kopf, Pull-to-Refresh), beim Tab-Wechsel, beim Öffnen der Einstellungen, wenn die App in den Hintergrund geht, oder beim Tipp auf das Kreuz. Danach ist der Vorgang nicht mehr rückgängig zu machen.
+- [x] Ein erneutes „Alles abhaken", während die Leiste steht, ersetzt sie durch eine neue Leiste für den neuen Vorgang; der alte Vorgang ist nicht mehr rückgängig zu machen.
+- [x] Ist nichts abzuhaken, passiert beim Tipp nichts und es erscheint keine Leiste (die Aktion ist wie heute ohnehin nur sichtbar, wenn die Liste Artikel hat).
+- [x] Der Fehlerfall des ursprünglichen Abhakens bleibt wie heute: Mealie-Artikel werden lokal zurückgerollt und der Toast „Mealie: Abhaken fehlgeschlagen" erscheint; die Leiste zeigt in diesem Fall nur die Anzahl der eigenen Artikel und ihr Rückgängig betrifft nur diese.
 
 ### FEIN-005: Luft am Listenende in allen Tabs
 **Priority:** 5

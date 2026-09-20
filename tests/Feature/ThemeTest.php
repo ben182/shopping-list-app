@@ -2,6 +2,7 @@
 
 use App\Erscheinungsbild\Akzentfarbe;
 use App\Erscheinungsbild\Farbwahl;
+use App\Liste\EigeneListe;
 use Native\Mobile\Testing\Native;
 use Native\Mobile\UI\Theme;
 
@@ -25,6 +26,30 @@ it('schickt zu jeder Farbe eine davon verschiedene Dark-Mode-Entsprechung mit', 
             ->not->toBe($paar['hell']);
     }
 })->with(['/', '/vorrat', '/wochenplan', '/einstellungen']);
+
+it('färbt auch die Leiste nach „Alles abhaken“ in beiden Erscheinungsbildern', function () {
+    app(EigeneListe::class)->hinzufuegen('tofu');
+
+    $screen = Native::visit('/', platform: 'android')->press('alleAbhaken');
+
+    // Ohne die Leiste im Baum prüfte der Test nur die Screens ohne sie.
+    $leiste = knotenMitRef($screen, 'rueckgaengig-leiste');
+
+    expect($leiste)->not->toBeNull();
+
+    // Surface als Fläche, Outline als Rand — Werte aus der PRD, nicht aus
+    // der Konfiguration abgeleitet.
+    expect($leiste['style']['bg_color'])->toBe('#FFFFFF')
+        ->and($leiste['props']['dark_bg_color'])->toBe('#1E293B')
+        ->and($leiste['style']['border_color'])->toBe('#CBD5E1')
+        ->and($leiste['props']['dark_border_color'])->toBe('#475569');
+
+    foreach (farbPaare($screen->tree()) as $paar) {
+        expect($paar['dunkel'])
+            ->not->toBeNull("Farbe {$paar['hell']} hat keine Dark-Mode-Entsprechung — feste Farbe statt Theme-Klasse?")
+            ->not->toBe($paar['hell']);
+    }
+});
 
 /**
  * Kontrastverhältnis zweier Farben nach der WCAG-2-Formel — bewusst hier

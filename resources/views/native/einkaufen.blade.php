@@ -134,6 +134,31 @@
         </native:list>
     @endif
 
+    {{-- Die Rücknahme des letzten „Alles abhaken“ — ohne Timer, aber auch
+         ohne zweiten Tap vorher. Sie sitzt über dem Block „Abgehakt“ und
+         damit, wenn der fehlt, direkt über der Tab-Leiste. --}}
+    @php($vorgang = $this->rueckgaengigVorgang())
+    @if ($vorgang !== null)
+        <native:row ref="rueckgaengig-leiste" class="w-full items-center gap-2 border-theme-outline bg-theme-surface px-4 py-2">
+            <native:text class="flex-1 text-sm text-theme-on-surface">{{ $vorgang->text() }}</native:text>
+            <native:button
+                ref="rueckgaengig"
+                size="sm"
+                variant="ghost"
+                label="Rückgängig"
+                @press="rueckgaengigMachen"
+            />
+            <native:pressable
+                ref="rueckgaengig-schliessen"
+                class="h-10 w-10 items-center justify-center"
+                a11y-label="Schließen"
+                @press="leisteSchliessen"
+            >
+                <native:icon :ios="Ios::Xmark" :android="Android::Close" :size="20" class="text-theme-on-surface-variant" />
+            </native:pressable>
+        </native:row>
+    @endif
+
     {{-- „Abgehakt“ sitzt fest über der Tab-Leiste statt am Ende der Liste:
          so bleibt er erreichbar, ohne durch die ganze Liste zu scrollen, und
          liest sich nicht mehr als letzte Zeile der Gruppe darüber. Er hängt

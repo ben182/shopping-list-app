@@ -1,7 +1,7 @@
 <?php
 
 use App\Liste\EigeneListe;
-use Native\Mobile\Events\Alert\ButtonPressed;
+use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Testing\Native;
 
 /*
@@ -142,34 +142,18 @@ it('zeigt die Action „Alles abhaken“ nur, solange mindestens ein Artikel off
     Native::visit('/')->assertElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
 });
 
-it('fragt vor dem Abhaken mit einem nativen Dialog nach', function () {
+it('hakt ohne Nachfrage sofort alles ab und stellt die Leiste zum Rückgängigmachen hin', function () {
     aufDieListe('tofu', 'hummus', 'salz');
 
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['title'] === 'Alles abhaken?'
-            && $params['message'] === '3 eigene Artikel wandern zurück in den Vorrat.'
-            && collect($params['buttons'])->map(fn ($button) => is_array($button) ? $button['label'] : $button)->all() === ['Abbrechen', 'Abhaken']);
-});
+    $screen = Native::visit('/')->press('alleAbhaken');
 
-it('zählt im Dialogtext den einen Artikel im Singular', function () {
-    aufDieListe('tofu');
-
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message'] === '1 eigener Artikel wandert zurück in den Vorrat.');
-});
-
-it('schickt nach „Abhaken“ alle Artikel zurück in den Vorrat', function () {
-    aufDieListe('tofu', 'hummus', 'salz');
-
-    Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken'])
+    $screen->assertNativeNotCalled('Dialog.Alert')
         ->assertSee('Liste ist leer.')
         ->assertSee('Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.')
         ->assertMissingElement('list_item')
         ->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toBe(['3 Artikel abgehakt', 'Rückgängig']);
 
     $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
         ->flatMap(fn (array $abschnitt) => $abschnitt['artikel']);
@@ -177,26 +161,152 @@ it('schickt nach „Abhaken“ alle Artikel zurück in den Vorrat', function () 
     expect($vorrat)->toContain('Tofu', 'Hummus', 'Salz')->toHaveCount(112);
 });
 
-it('lässt die Liste nach „Abbrechen“ unverändert', function () {
+it('zählt im Leistentext den einen Artikel im Singular', function () {
+    aufDieListe('tofu');
+
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
+});
+
+it('holt mit „Rückgängig“ genau die eigenen Artikel in ihre Warengruppen zurück', function () {
+    aufDieListe('tofu', 'salz');
+
+    $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
+
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
+        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
+    ]);
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+
+    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
+        ->flatMap(fn (array $abschnitt) => $abschnitt['artikel']);
+
+    expect($vorrat)->not->toContain('Tofu')->not->toContain('Salz');
+});
+
+it('gibt der Leiste einen Textknopf in der Akzentfarbe', function () {
+    aufDieListe('tofu');
+
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    // `ghost` ist der Knopf ohne Fläche — seine Schrift zeichnet das Gerät
+    // aus dem Theme in der Primärfarbe. Im Baum steht deshalb die Variante,
+    // nicht die Farbe.
+    expect(knotenMitRef($screen, 'rueckgaengig')['props'] ?? [])
+        ->toMatchArray(['label' => 'Rückgängig', 'variant' => 'ghost']);
+});
+
+it('beschriftet das Kreuz der Leiste für Screenreader und räumt sie damit ab', function () {
+    aufDieListe('tofu');
+
+    $screen = Native::visit('/', platform: 'android')->press('alleAbhaken');
+
+    $screen->assertAccessible();
+
+    expect(knotenMitRef($screen, 'rueckgaengig-schliessen')['props']['a11y_label'] ?? null)
+        ->toBe('Schließen');
+
+    $screen->press('leisteSchliessen');
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+});
+
+it('macht den Vorgang nach dem Kreuz nicht mehr rückgängig', function () {
+    aufDieListe('tofu');
+
+    $screen = Native::visit('/')
+        ->press('alleAbhaken')
+        ->press('leisteSchliessen')
+        ->press('rueckgaengigMachen');
+
+    $screen->assertSee('Liste ist leer.');
+});
+
+it('räumt die Leiste beim Pull-to-Refresh ab', function () {
+    aufDieListe('tofu', 'salz');
+
+    $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
+
+    // Die Artikel stehen wieder da — jetzt die Interaktion, die die zweite
+    // Leiste abräumen soll.
+    $screen->press('alleAbhaken')->press('neuLaden');
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+
+    $screen->press('rueckgaengigMachen')->assertSee('Liste ist leer.');
+});
+
+it('räumt die Leiste beim Öffnen der Einstellungen ab', function () {
+    aufDieListe('tofu', 'salz');
+
+    $screen = Native::visit('/')->press('alleAbhaken')->press('oeffneEinstellungen');
+
+    // Der Weg des Geräts: die Einstellungen kommen auf den Stapel, und der
+    // Rückweg nimmt den Einkaufen-Screen samt Zustand wieder auf.
+    $zurueck = $screen->followNavigation()->goBack();
+
+    expect(rueckgaengigLeiste($zurueck))->toBeNull();
+
+    $zurueck->press('rueckgaengigMachen')->assertSee('Liste ist leer.');
+});
+
+it('räumt die Leiste beim Tipp auf eine Zeile ab', function () {
     aufDieListe('tofu', 'salz');
 
     $screen = Native::visit('/')
-        ->press('alleAbhakenBestaetigen')
-        ->emitNative(ButtonPressed::class, ['index' => 0, 'label' => 'Abbrechen']);
+        ->press('alleAbhaken')
+        ->press('rueckgaengigMachen')
+        ->tap('Tofu');
 
-    expect(listenAbschnitte($screen))->toBe([
-        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
-        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
-    ]);
+    expect(rueckgaengigLeiste($screen))->toBeNull();
 });
 
-it('lässt die Liste unverändert, wenn der Dialog ohne Button geschlossen wird', function () {
+it('räumt die Leiste beim Tab-Wechsel ab', function () {
+    aufDieListe('tofu');
+
+    Native::visit('/')->press('alleAbhaken');
+
+    expect(rueckgaengigLeiste(Native::visit('/vorrat')))->toBeNull();
+    expect(rueckgaengigLeiste(Native::visit('/')))->toBeNull();
+});
+
+it('räumt die Leiste ab, wenn die App aus dem Hintergrund zurückkommt', function () {
+    aufDieListe('tofu');
+
+    $screen = Native::visit('/')->press('alleAbhaken');
+
+    $screen->emitNative(AppForegrounded::class);
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
+});
+
+it('ersetzt eine stehende Leiste durch die des neuen Vorgangs', function () {
     aufDieListe('tofu', 'salz');
 
-    $screen = Native::visit('/')->press('alleAbhakenBestaetigen');
+    $screen = Native::visit('/')->press('alleAbhaken');
 
-    expect(listenAbschnitte($screen))->toBe([
-        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
-        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
-    ]);
+    // Erst den Vorrat wieder auf die Liste holen, ohne die Leiste zu
+    // berühren — dann steht ein zweiter Vorgang mit anderer Anzahl an.
+    aufDieListe('tofu');
+
+    $screen->press('alleAbhaken');
+
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
+
+    $screen->press('rueckgaengigMachen');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+});
+
+it('lässt bei leerer Liste weder die Action noch eine Leiste stehen', function () {
+    $screen = Native::visit('/');
+
+    $screen->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken')
+        ->assertSee('Liste ist leer.');
+
+    expect(rueckgaengigLeiste($screen))->toBeNull();
 });

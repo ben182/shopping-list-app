@@ -48,6 +48,17 @@
 - **Was nativ gefärbt wird, steht nicht im Wire-Tree.** Tab-Leiste, Buttons
   und Checkboxen tragen dort keine Farbe — der Seam dafür ist
   `Theme::get('light.primary')` nach einem `Native::visit()`.
+- **Zustand über einen Handler-Aufruf hinaus braucht `singleton()`** in
+  `AppServiceProvider::register()`. `app(X::class)` liefert sonst jedes Mal
+  eine frische Instanz, und das Geschriebene ist beim nächsten Render weg.
+- **Screen-Lebenszyklus im Test**: Ein Tab-Wechsel mountet den Screen neu
+  (`mount()` läuft), ein Ausflug zu den Einstellungen nicht — der Rückweg
+  feuert nur `onResume()`. Der Harness-Weg dafür ist
+  `press(...)->followNavigation()->goBack()`; nach einem `navigate()` blockt
+  er jede weitere Interaktion auf dem alten Screen.
+- **`press()` sieht nur Handler des letzten Renders.** Wer eine Interaktion
+  prüfen will, muss erst den Zustand herstellen, in dem ihr Element im Baum
+  steht.
 - **`vendor/bin/pint --dirty`** vor jedem Commit.
 
 ---
@@ -256,3 +267,78 @@ Wochenplan.
 - **Nicht auf dem Emulator verifiziert** — an der nativen Hälfte hat sich
   nichts geändert, ein Rebuild wäre nur für den Augenschein gewesen.
 <!-- chief-timing story="FEIN-003" duration_ms=545023 cost=23.716805 in=226 out=850 cache_create=331841 cache_read=11618431 -->
+
+## 2026-09-20 - FEIN-004 - „Alles abhaken“ mit Rückgängig statt Nachfrage
+
+Der Bestätigungsdialog ist weg. Ein Tipp auf die Action räumt die eigenen
+Artikel zurück in den Vorrat und hakt alle offenen Mealie-Artikel in einem
+Bulk-Update ab. Stattdessen steht unten — über dem Block „Abgehakt“, und wo
+der fehlt, direkt über der Tab-Leiste — eine Leiste mit „N Artikel
+abgehakt“, einem Ghost-Knopf „Rückgängig“ und einem Schließen-Kreuz. Sie
+verschwindet ohne Timer bei der ersten Interaktion (Zeile, Checkbox,
+Abgehakt-Kopf, Pull-to-Refresh), beim Tab-Wechsel, beim Öffnen der
+Einstellungen, beim Zurückkommen aus dem Hintergrund und beim Tipp auf das
+Kreuz.
+
+**Geänderte Dateien**
+
+- `app/Einkaufen/Abhakvorgang.php` (neu) — der zurücknehmbare Vorgang:
+  eigene Artikel-IDs plus Mealies Darstellung der abgehakten Artikel,
+  `text()`, `leer()`, `mealieVergessen()`
+- `app/Einkaufen/Rueckgaengig.php` (neu) — hält höchstens einen Vorgang;
+  ein leer gewordener zählt als keiner
+- `app/Providers/AppServiceProvider.php` — `Rueckgaengig` als Singleton
+- `app/NativeComponents/Einkaufen.php` — `alleAbhaken()` statt
+  `alleAbhakenBestaetigen()`, `rueckgaengigMachen()`, `leisteSchliessen()`,
+  `mealieZurueckholen()`, `leisteVerwerfen()` an allen Interaktionen
+- `resources/views/native/einkaufen.blade.php` — die Leiste
+- `tests/Pest.php` — `texteIn()`, `rueckgaengigLeiste()`, `farbPaare()`
+  nimmt jetzt auch Randfarben mit
+- `tests/Feature/EinkaufenTest.php`, `tests/Feature/EinkaufenMealieTest.php`
+  — die Dialog-Tests umgeschrieben, Rücknahme und Abräumen ergänzt
+- `tests/Feature/ThemeTest.php` — ein Fall, der die Leiste im Baum hat
+
+**Learnings for future iterations:**
+
+- **`app(X::class)` ist ohne `singleton()` jedes Mal eine neue Instanz** —
+  eine Fachklasse, die Zustand über einen Handler-Aufruf hinaus halten soll,
+  braucht den Eintrag in `AppServiceProvider::register()`. Ohne ihn
+  verschwindet der Zustand lautlos zwischen „Handler schreibt“ und „View
+  liest“, und der Test zeigt nur einen fehlenden Knoten.
+- **„Verschwindet beim Tab-Wechsel“ ist geschenkt**: Der Einkaufen-Screen
+  wird dabei neu gemountet — ein `verwerfen()` in `mount()` genügt. „Beim
+  Öffnen der Einstellungen“ dagegen nicht: dort bleibt die Instanz auf dem
+  Stapel stehen und bekommt beim Rückweg nur `onResume()`.
+- **Der Test dafür ist `followNavigation()->goBack()`** — das ist im Harness
+  genau der Geräteweg (Screen auf den Stapel, zurück mit `onResume()` und
+  erhaltenem Zustand). Ein zweites `Native::visit('/')` wäre tautologisch,
+  weil es ohnehin neu mountet.
+- **`press()` findet nur Handler, die im letzten Render registriert sind.**
+  `abgehakteUmklappen` gibt es nur mit abgehakten Mealie-Artikeln, `neuLaden`
+  nur mit gefüllter Liste, die Top-Bar-Action nur, wenn etwas offen ist.
+  Ein Dataset über „alle Interaktionen“ scheitert daran; die Fälle gehören
+  in die Testdatei, die den passenden Zustand herstellt.
+- **Nach `navigate()` blockt das Harness jede weitere Interaktion** mit
+  „Cannot interact: the component navigated away“. Entweder
+  `followNavigation()` oder vorher fertig prüfen.
+- **`variant="ghost"`** ist der Textknopf ohne Fläche; seine Schrift holt
+  sich das Gerät aus dem Theme (Primärfarbe). Im Wire-Tree steht deshalb
+  `props.variant`, keine Farbe — derselbe Fall wie Tab-Leiste und Checkboxen.
+- **`border-theme-*` funktioniert** und liefert `style.border_color` plus
+  `props.dark_border_color`. `farbPaare()` nimmt das jetzt mit; wer einen
+  festen Rand setzt, fällt damit im Theme-Test auf. `border-t` gibt es
+  weiterhin nicht — seitenweise Ränder kennt der Parser nicht, dafür bleibt
+  die Haarlinie (`h-px` + `bg-theme-outline-variant`) das Mittel.
+- **Der Theme-Test sieht nur, was der Ausgangszustand rendert.** Ein
+  Element, das erst nach einer Interaktion erscheint, braucht einen eigenen
+  Fall mit genau dieser Interaktion — sonst ist das Kriterium „folgt dem
+  bestehenden Theme-Test“ nur auf dem Papier erfüllt.
+- **Rückrollen eines Bulk-Updates muss den Vorgang mitkorrigieren**: Nimmt
+  Mealie das Abhaken nicht an, stehen die Artikel wieder offen da und gehören
+  nicht mehr zu dem, was „Rückgängig“ zurückholt. Bleibt der Vorgang danach
+  leer, darf gar keine Leiste mehr stehen — sonst steht dort „0 Artikel
+  abgehakt“.
+- **Nicht auf dem Emulator verifiziert** — an der nativen Hälfte hat sich
+  nichts geändert.
+---
+<!-- chief-timing story="FEIN-004" duration_ms=580167 cost=22.985644 in=180 out=673 cache_create=401633 cache_read=10267900 -->
