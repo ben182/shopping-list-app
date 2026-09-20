@@ -191,7 +191,9 @@ final class ReleaseCommand extends Command
     {
         $this->components->info('Build (das dauert)');
 
-        $erfolg = $this->artisan(['native:package', 'android'], timeout: 3600)->successful();
+        // Ohne --no-tty hängt `native:package` seinen Gradle-Prozess an /dev/tty.
+        // Als Kindprozess gibt es kein Terminal, der Build bricht dann ohne APK ab.
+        $erfolg = $this->artisan(['native:package', 'android', '--no-tty', '--no-interaction'], timeout: 3600)->successful();
 
         $this->cachesLeeren();
 
