@@ -1,0 +1,41 @@
+{
+    "namespace": "SecureStorage",
+    "bridge_functions": [
+        {
+            "name": "SecureStorage.Set",
+            "android": "de.ben182.securestorage.SecureStorageFunctions.Set",
+            "ios": "SecureStorageFunctions.Set",
+            "description": "Store a value in the Keystore / Keychain"
+        },
+        {
+            "name": "SecureStorage.Get",
+            "android": "de.ben182.securestorage.SecureStorageFunctions.Get",
+            "ios": "SecureStorageFunctions.Get",
+            "description": "Read a value from the Keystore / Keychain"
+        },
+        {
+            "name": "SecureStorage.Delete",
+            "android": "de.ben182.securestorage.SecureStorageFunctions.Delete",
+            "ios": "SecureStorageFunctions.Delete",
+            "description": "Delete a value from the Keystore / Keychain"
+        }
+    ],
+    "android": {
+        "min_version": 29,
+        "permissions": [],
+        "dependencies": {
+            "implementation": [
+                "androidx.security:security-crypto:1.1.0-alpha06"
+            ]
+        }
+    },
+    "ios": {
+        "min_version": "18.0",
+        "info_plist": {},
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+    "events": []
+}

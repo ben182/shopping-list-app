@@ -1,12 +1,24 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Native\Mobile\AsyncTask;
+use Native\Mobile\Testing\FakeBridge;
+use Native\Mobile\Testing\Native;
 use Native\Mobile\Testing\TestableComponent;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+/*
+ * Beide Fakes sind statischer Zustand im Paket und überleben sonst den Test,
+ * in dem sie gesetzt wurden.
+ */
+afterEach(function (): void {
+    FakeBridge::disable();
+    AsyncTask::clearFake();
+});
 
 /**
  * Labels der nativen Tab-Leiste in Render-Reihenfolge.
@@ -148,4 +160,35 @@ function knotenMitRef(TestableComponent $screen, string $ref): ?array
     $walk($screen->tree());
 
     return $treffer;
+}
+
+/**
+ * Ein Secure Storage, der sich merkt, was er bekommen hat: Schreiben füllt
+ * ihn, Lesen gibt zurück, was zuletzt geschrieben wurde, Löschen leert ihn.
+ * Ein `respondTo()` mit festem Array könnte das nicht — der Screen liest den
+ * Status nach jedem Schreiben neu, und genau dieser zweite Blick ist das,
+ * was geprüft werden soll.
+ */
+function fakeSecureStore(?string $anfangswert = null): FakeBridge
+{
+    $gespeichert = $anfangswert;
+
+    return Native::fakeBridge()
+        // Bewusst keine Pfeilfunktion: die bindet `$gespeichert` per Wert und
+        // sähe damit für immer den Anfangswert.
+        ->respondTo('SecureStorage.Get', function () use (&$gespeichert): array {
+            return $gespeichert === null
+                ? ['status' => 'not_found', 'value' => '']
+                : ['status' => 'found', 'value' => $gespeichert];
+        })
+        ->respondTo('SecureStorage.Set', function (array $params) use (&$gespeichert): array {
+            $gespeichert = $params['value'];
+
+            return ['success' => true];
+        })
+        ->respondTo('SecureStorage.Delete', function () use (&$gespeichert): array {
+            $gespeichert = null;
+
+            return ['success' => true];
+        });
 }

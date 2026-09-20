@@ -97,19 +97,20 @@ Prefix: `EKL`.
 - [x] „Abbrechen“ oder Schließen des Dialogs verändert nichts.
 
 ### EKL-006: SecureStorage-Plugin und Einstellungen-Screen für das Mealie-Token
+**Status:** done
 **Priority:** 6
 **Blocked by:** EKL-001
 **Description:** Als Nutzer möchte ich mein Mealie-API-Token einmalig in der App hinterlegen und die Verbindung testen, damit die App auf Mealie zugreifen kann, ohne dass das Token im App-Code liegt.
 
 **Acceptance Criteria:**
-- [ ] Das lokale Plugin `plugins/secure-storage` aus `~/Herd/kitchen-sink` ist in das Projekt übernommen, mit eigenem Vendor-Namespace (PHP `Ben182\SecureStorage`, Kotlin-Package `de.ben182.securestorage`, Composer-Name `ben182/secure-storage`), in `composer.json` als Path-Repository eingebunden und in der Plugin-Allowlist des `NativeServiceProvider` registriert; `php artisan native:plugin:list` führt es als registriert auf.
-- [ ] Der Einstellungen-Screen (Titel „Einstellungen“) zeigt die Mealie-URL als nicht editierbaren Text (Wert aus der Konfiguration, hart hinterlegt: `https://mealie.example.test`).
-- [ ] Darunter ein maskiertes Eingabefeld „API-Token“ (`native:outlined-text-input`, `secure`) und ein Button „Speichern“. Speichern mit leerem Feld zeigt den Toast „Bitte Token eingeben“ und speichert nichts. Erfolgreiches Speichern zeigt den Toast „Token gespeichert“; das Feld wird geleert und der Status zeigt „Token hinterlegt“.
-- [ ] Der Status-Text unter dem Feld zeigt beim Öffnen des Screens einen der Zustände: „Kein Token hinterlegt“, „Token hinterlegt“, „Gerät gesperrt, Token nicht lesbar“ oder „Fehler beim Lesen: <Code>“. Das Token selbst wird nie im Klartext angezeigt.
-- [ ] Ein Button „Verbindung testen“ ist nur aktiv, wenn ein Token hinterlegt ist. Tap ruft Mealie auf und zeigt bei Erfolg den Text „Verbunden: <Nutzername>, Mealie <Version>“ (Nutzername aus `/api/users/self`, Version aus `/api/app/about`). Bei HTTP 401 zeigt er „Token ungültig“, bei Netzwerkfehler oder Timeout „Mealie nicht erreichbar“. Während des Tests zeigt der Button einen Ladezustand.
-- [ ] Ein Button „Token löschen“ (destruktive Variante) öffnet einen Dialog „Token löschen?“ mit „Abbrechen“ / „Löschen“; „Löschen“ entfernt das Token aus dem Secure Storage, der Status wechselt auf „Kein Token hinterlegt“.
-- [ ] Ein gespeichertes Token ist nach Beenden und Neustart der App weiterhin hinterlegt.
-- [ ] Im Testkontext (ohne native Bridge) meldet der Screen „Fehler beim Lesen: BRIDGE_UNAVAILABLE“ statt abzustürzen.
+- [x] Das lokale Plugin `plugins/secure-storage` aus `~/Herd/kitchen-sink` ist in das Projekt übernommen, mit eigenem Vendor-Namespace (PHP `Ben182\SecureStorage`, Kotlin-Package `de.ben182.securestorage`, Composer-Name `ben182/secure-storage`), in `composer.json` als Path-Repository eingebunden und in der Plugin-Allowlist des `NativeServiceProvider` registriert; `php artisan native:plugin:list` führt es als registriert auf.
+- [x] Der Einstellungen-Screen (Titel „Einstellungen“) zeigt die Mealie-URL als nicht editierbaren Text (Wert aus der Konfiguration, hart hinterlegt: `https://mealie.example.test`).
+- [x] Darunter ein maskiertes Eingabefeld „API-Token“ (`native:outlined-text-input`, `secure`) und ein Button „Speichern“. Speichern mit leerem Feld zeigt den Toast „Bitte Token eingeben“ und speichert nichts. Erfolgreiches Speichern zeigt den Toast „Token gespeichert“; das Feld wird geleert und der Status zeigt „Token hinterlegt“.
+- [x] Der Status-Text unter dem Feld zeigt beim Öffnen des Screens einen der Zustände: „Kein Token hinterlegt“, „Token hinterlegt“, „Gerät gesperrt, Token nicht lesbar“ oder „Fehler beim Lesen: <Code>“. Das Token selbst wird nie im Klartext angezeigt.
+- [x] Ein Button „Verbindung testen“ ist nur aktiv, wenn ein Token hinterlegt ist. Tap ruft Mealie auf und zeigt bei Erfolg den Text „Verbunden: <Nutzername>, Mealie <Version>“ (Nutzername aus `/api/users/self`, Version aus `/api/app/about`). Bei HTTP 401 zeigt er „Token ungültig“, bei Netzwerkfehler oder Timeout „Mealie nicht erreichbar“. Während des Tests zeigt der Button einen Ladezustand.
+- [x] Ein Button „Token löschen“ (destruktive Variante) öffnet einen Dialog „Token löschen?“ mit „Abbrechen“ / „Löschen“; „Löschen“ entfernt das Token aus dem Secure Storage, der Status wechselt auf „Kein Token hinterlegt“.
+- [x] Ein gespeichertes Token ist nach Beenden und Neustart der App weiterhin hinterlegt.
+- [x] Im Testkontext (ohne native Bridge) meldet der Screen „Fehler beim Lesen: BRIDGE_UNAVAILABLE“ statt abzustürzen.
 
 ### EKL-007: Offene Mealie-Artikel in der Einkaufs-Übersicht anzeigen
 **Priority:** 7

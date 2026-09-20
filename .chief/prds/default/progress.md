@@ -95,6 +95,21 @@
   `top_bar_action` mit `props.a11y_label`.
 - **Gruppenreihenfolge im Katalog:** Obst & Gemüse, Brot & Backwaren, Kühlregal,
   Tiefkühl, Lebensmittel, Getränke, Haushalt, Drogerie.
+- **Kein Mid-Handler-Render:** Der Runloop rendert erst *nach* dem Handler.
+  Netzwerkaufrufe mit sichtbarem Ladezustand gehören darum in
+  `$this->async(static fn () => …)->finished(…)->failed(…)`; die Closure muss
+  `static` sein und darf nur Serialisierbares einfangen. `->failed()` ist die
+  einzige Garantie, dass ein Spinner wieder ausgeht. Im Test `AsyncTask::fake()`.
+- **`TestableComponent::tree()` ist der zuletzt publizierte Baum**, kein frisches
+  Rendern. Handler-interne Zustände nur über `$screen->get('prop')` prüfen;
+  `$screen->set('prop', …)` rendert neu.
+- **Secure Storage im Test:** `fakeSecureStore(?string $anfangswert)` in
+  `tests/Pest.php` ist ein In-Memory-Keystore über `Native::fakeBridge()`.
+  `tests/Pest.php` räumt `FakeBridge` und `AsyncTask` in einem `afterEach` weg.
+- **Optionale Bool-Props (`disabled`, `loading`) stehen nur im Baum, wenn wahr** —
+  Erwartungen mit `?? false` schreiben.
+- **Mealie-Konfiguration** in `config/mealie.php` (`url`, `shopping_list_id`,
+  `timeout`), das Token ausschließlich über `App\Mealie\Token`.
 
 ---
 
@@ -415,3 +430,83 @@ neuen.
   `navSubtitle()` und der Leerzustand.
 ---
 <!-- chief-timing story="EKL-005" duration_ms=236214 cost=12.414086 in=144 out=509 cache_create=235748 cache_read=5302317 -->
+
+## 2026-09-20 - EKL-006
+
+Das SecureStorage-Plugin aus `~/Herd/kitchen-sink` liegt jetzt unter
+`plugins/secure-storage` mit eigenem Vendor-Namespace (`Ben182\SecureStorage`,
+`de.ben182.securestorage`, `ben182/secure-storage`), hängt über das bereits
+vorhandene `plugins/*`-Path-Repo in `composer.json` und steht in
+`NativeServiceProvider::plugins()`. `native:plugin:list` führt es mit 3
+Bridge-Funktionen auf, `native:plugin:validate` meldet OK.
+
+Der Einstellungen-Screen verwaltet darüber das Mealie-Token: Server-URL als
+Text, maskiertes Feld „API-Token“, „Speichern“ (Toast „Bitte Token eingeben“
+bzw. „Token gespeichert“, Feld wird geleert), Statuszeile mit den vier
+`SecureStorageStatus`-Ausgängen, „Verbindung testen“ (nur aktiv mit Token,
+Ladezustand am Knopf) und „Token löschen“ (destruktiv, mit Bestätigungsdialog).
+
+**Dateien**
+
+- `plugins/secure-storage/{composer.json,nativephp.json,src/SecureStorageServiceProvider.php,resources/android/SecureStorageFunctions.kt,resources/ios/SecureStorageFunctions.swift}`
+- `composer.json` / `composer.lock` — `ben182/secure-storage: @dev`
+- `app/Providers/NativeServiceProvider.php` — Allowlist
+- `config/mealie.php` — `url`, `shopping_list_id`, `timeout`
+- `app/Mealie/Token.php` — Schlüssel `einkaufsliste.mealie-token`, `read()`/`set()`/`delete()`
+- `app/Mealie/Verbindung.php` — statischer Verbindungstest gegen Mealie
+- `app/NativeComponents/Einstellungen.php`, `resources/views/native/einstellungen.blade.php`
+- `tests/Pest.php` — `afterEach`-Aufräumen, Helfer `fakeSecureStore()`
+- `tests/Feature/EinstellungenTest.php` — 23 Tests
+
+82 Tests, 554 Assertions, grün. Pint sauber. `native:validate` rot mit 8 statt 7
+„Unknown native element type“-Meldungen — die neue ist das
+`outlined-text-input` im Einstellungen-Blade, also wieder nur ein
+mobile-ui-Tag, das der Core-Analyzer nicht kennt. Keine andere Fehlerart.
+
+**Learnings für die nächsten Iterationen**
+
+- **Path-Repo-Plugins brauchen `@dev` als Constraint.** `composer require
+  ben182/secure-storage:"*"` scheitert an `minimum-stability: stable`, weil
+  Composer dem Pfad-Paket die Version des aktuellen Git-Branchs gibt
+  (`dev-chief/default`). `:"@dev"` löst das und bleibt beim Branch-Wechsel gültig.
+- **Der PHP-Teil von SecureStorage ist schon im Core** (`Native\Mobile\SecureStorage`,
+  `SecureStorageResult`, `SecureStorageStatus`, Facade). Das Plugin liefert nur
+  die native Hälfte und bindet die Core-Klasse als Singleton. Ohne Bridge gibt
+  `read()` von sich aus `SecureStorageResult::failure('BRIDGE_UNAVAILABLE', …)`
+  zurück — der „Testkontext ohne Bridge“-Zustand braucht keinen eigenen Code.
+- **`Native::fakeBridge()->respondTo()` nimmt Closures** und wird damit zum
+  kleinen In-Memory-Keystore (`fakeSecureStore()` in `tests/Pest.php`): Set
+  merkt sich den Wert, Get gibt ihn zurück, Delete leert ihn. Wichtig: **keine
+  Pfeilfunktion** für den Get-Handler — `fn () => $gespeichert` bindet per Wert
+  und sieht für immer den Anfangswert. `function () use (&$…)` ist Pflicht.
+- **FakeBridge und AsyncTask-Fake sind statischer Paket-Zustand.** `tests/Pest.php`
+  räumt beide jetzt in einem `afterEach` weg (`FakeBridge::disable()`,
+  `AsyncTask::clearFake()`), sonst lecken sie in den nächsten Test.
+- **Es gibt keinen Mid-Handler-Render.** Der Runloop ist
+  `render → publish → wait → handler → loop`; ein synchrones `Http::get()` im
+  Press-Handler friert die UI ein und jeder Spinner, den man davor setzt, wird
+  nie gezeichnet. Der Weg dafür ist `$this->async(static fn () => …)` mit
+  `->finished()` / `->failed()`. Die Closure muss **static** sein (läuft in einem
+  eigenen Interpreter), darf nur Serialisierbares einfangen, und `->failed()`
+  ist die einzige Garantie, dass ein Spinner wieder ausgeht — auch wenn der Task
+  gar nicht erst startet.
+- **Im Test `AsyncTask::fake()` setzen**, dann läuft die Arbeit inline und
+  `Http::fake()` greift. Ohne `fake()` liefert der Transport `false` und nur
+  `->failed()` feuert.
+- **`TestableComponent::tree()` ist der *zuletzt publizierte* Baum**, kein
+  frisches Rendern. Ein Zustand, der nur innerhalb eines Handlers existiert
+  (z. B. `$testLaeuft`), steht in keinem Baum — prüfbar ist er über
+  `$screen->get('prop')` aus einem `Http::fake()`-Callback heraus; dass der
+  Knopf ihn trägt, zeigt danach `$screen->set('prop', true)` (das rendert neu).
+- **`disabled` und `loading` am `native:button` stehen nur im Baum, wenn sie
+  wahr sind** (`if (! empty($attrs[…]))`). Erwartungen also mit `?? false`
+  schreiben, sonst „Undefined array key“.
+- **Toasts:** `Dialog::toast($text)` → Bridge-Call `Dialog.Toast` mit `message`
+  und `duration`; im Test `assertNativeCalled('Dialog.Toast', fn ($p) => …)`.
+- Für EKL-007/011: Token-Zugriff ausschließlich über `App\Mealie\Token`
+  (Schlüssel `einkaufsliste.mealie-token`, geschrieben mit `AfterFirstUnlock`),
+  Basis-URL und Timeout aus `config/mealie.php`. `App\Mealie\Verbindung` ist
+  bewusst statisch und abhängigkeitsfrei — alles, was über `async` läuft, muss
+  sich serialisieren lassen.
+---
+<!-- chief-timing story="EKL-006" duration_ms=885065 cost=38.459031 in=348 out=1202 cache_create=761202 cache_read=16060749 -->

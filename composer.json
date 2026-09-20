@@ -26,6 +26,7 @@
     ],
     "require": {
         "php": "^8.3",
+        "ben182/secure-storage": "@dev",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
         "nativephp/mobile": "^4.5",

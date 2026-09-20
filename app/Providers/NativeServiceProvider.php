@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Ben182\SecureStorage\SecureStorageServiceProvider;
 use Illuminate\Support\ServiceProvider;
 use Native\Mobile\UI\NativeUIServiceProvider;
 
@@ -36,6 +37,7 @@ class NativeServiceProvider extends ServiceProvider
     {
         return [
             NativeUIServiceProvider::class,
+            SecureStorageServiceProvider::class,
         ];
     }
 }
