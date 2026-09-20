@@ -24,6 +24,10 @@ use Native\Mobile\Testing\TestableComponent;
  * Ein Artikel der Mealie-Liste in der Form, die Mealie wirklich liefert
  * (nachgesehen an der echten Instanz, nicht aus dem Code abgeleitet).
  *
+ * `display` schreibt Mealie selbst zusammen: Menge, Einheit, Lebensmittel
+ * und zum Schluss die Notiz. Wer eine Notiz mitgibt, hängt sie deshalb auch
+ * hinten an `display` an — genau darauf trifft die App.
+ *
  * @param  list<string>  $rezeptIds
  * @return array<string, mixed>
  */
@@ -35,10 +39,18 @@ function mealieArtikel(
     string $erstelltAm = '2026-09-12T15:37:15.316035Z',
     array $rezeptIds = [],
     ?string $id = null,
+    ?string $lebensmittel = null,
+    string $notiz = '',
 ): array {
     return [
         'id' => $id ?? 'artikel-'.md5($display),
         'display' => $display,
+        'note' => $notiz,
+        'food' => $lebensmittel === null ? null : [
+            'id' => 'food-'.md5($lebensmittel),
+            'name' => $lebensmittel,
+            'pluralName' => null,
+        ],
         'checked' => $abgehakt,
         'position' => $position,
         'createdAt' => $erstelltAm,
@@ -48,6 +60,37 @@ function mealieArtikel(
             $rezeptIds,
         ),
     ];
+}
+
+/**
+ * Die Zeilen des Abschnitts „Verknüpfte Rezepte“ — leer, wenn es ihn nicht
+ * gibt.
+ *
+ * @return list<string>
+ */
+function rezeptBlock(TestableComponent $screen): array
+{
+    foreach (listenAbschnitte($screen) as $abschnitt) {
+        if (str_starts_with((string) $abschnitt['ueberschrift'], 'Verknüpfte Rezepte')) {
+            return $abschnitt['artikel'];
+        }
+    }
+
+    return [];
+}
+
+/**
+ * Die Überschrift des Rezeptblocks — `null`, wenn er fehlt.
+ */
+function rezeptBlockUeberschrift(TestableComponent $screen): ?string
+{
+    foreach (listenAbschnitte($screen) as $abschnitt) {
+        if (str_starts_with((string) $abschnitt['ueberschrift'], 'Verknüpfte Rezepte')) {
+            return $abschnitt['ueberschrift'];
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -264,28 +307,105 @@ it('behält bei gleicher Position die Reihenfolge nach Erstellzeitpunkt', functi
         ->toBe(['Zuerst erfasst', 'Später erfasst']);
 });
 
-it('zeichnet eine Mealie-Zeile mit leerer Checkbox, Rezeptname und Besteck-Icon', function () {
-    mitMealie(
-        [mealieArtikel('400 g mehligkochende Kartoffeln', label: 'Gemüse', rezeptIds: ['rezept-1'])],
-        ['rezept-1' => 'Vegane Brokkolisuppe'],
-    );
+it('zeichnet eine Mealie-Zeile mit leerer Checkbox, Notiz und Besteck-Icon', function () {
+    mitMealie([mealieArtikel(
+        '1 handvoll Koriander frisch, gehackt',
+        label: 'Gemüse',
+        lebensmittel: 'Koriander',
+        notiz: 'frisch, gehackt',
+    )]);
 
     Native::visit('/', platform: 'android')
-        ->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === '400 g mehligkochende Kartoffeln'
-            && ($node['props']['supporting'] ?? null) === 'Vegane Brokkolisuppe'
+        ->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === '1 handvoll Koriander'
+            && ($node['props']['supporting'] ?? null) === 'frisch, gehackt'
             && ($node['props']['leading_type'] ?? null) === 'checkbox'
             && ($node['props']['leading_checked'] ?? null) === false
             && ($node['props']['trailing_icon'] ?? null) === 'restaurant'
             && ($node['props']['trailing_a11y_label'] ?? null) === 'aus Mealie');
 });
 
-it('trennt mehrere Rezepte einer Zeile durch einen Mittelpunkt', function () {
+it('schneidet nur die Notiz ab und lässt Mealies Schreibweise der Menge stehen', function () {
+    mitMealie([mealieArtikel(
+        '¹/₂ TL Cayennepfeffer gestrichen',
+        label: 'Gewürze',
+        lebensmittel: 'Cayennepfeffer',
+        notiz: 'gestrichen',
+    )]);
+
+    expect(listenAbschnitte(Native::visit('/'))[0]['artikel'])->toBe(['¹/₂ TL Cayennepfeffer']);
+});
+
+it('lässt einen Artikel ohne Lebensmittel ganz stehen — sein Text steht komplett in der Notiz', function () {
+    mitMealie([mealieArtikel('2 Handtücher', label: 'Gemüse', notiz: 'Handtücher')]);
+
+    Native::visit('/')->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === '2 Handtücher'
+        && ($node['props']['supporting'] ?? '') === '');
+});
+
+it('lässt eine Zeile ohne Notiz ohne Untertitel', function () {
+    mitMealie([mealieArtikel('1 Bund Petersilie', label: 'Gemüse', lebensmittel: 'Petersilie')]);
+
+    Native::visit('/')->assertElement('list_item', fn (array $node) => ($node['props']['supporting'] ?? '') === '');
+});
+
+it('führt die Rezepte der Liste in einem eigenen Abschnitt unter den Warengruppen auf', function () {
     mitMealie(
-        [mealieArtikel('200 g Tomaten', label: 'Gemüse', rezeptIds: ['rezept-1', 'rezept-2'])],
+        [
+            mealieArtikel('200 g Tomaten', label: 'Gemüse', rezeptIds: ['rezept-1']),
+            mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', rezeptIds: ['rezept-2']),
+        ],
         ['rezept-1' => 'Vegane Brokkolisuppe', 'rezept-2' => 'Pasta Arrabiata'],
     );
 
-    Native::visit('/')->assertElement('list_item', fn (array $node) => ($node['props']['supporting'] ?? null) === 'Vegane Brokkolisuppe · Pasta Arrabiata');
+    $abschnitte = listenAbschnitte(Native::visit('/'));
+
+    expect($abschnitte)->toBe([
+        ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['200 g Tomaten', '1 Kopf Brokkoli']],
+        ['ueberschrift' => 'Verknüpfte Rezepte (2)', 'artikel' => ['Vegane Brokkolisuppe', 'Pasta Arrabiata']],
+    ]);
+});
+
+it('nennt ein Rezept nur einmal, egal an wie vielen Artikeln es hängt', function () {
+    mitMealie(
+        [
+            mealieArtikel('200 g Tomaten', label: 'Gemüse', rezeptIds: ['rezept-1', 'rezept-2']),
+            mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', rezeptIds: ['rezept-1']),
+        ],
+        ['rezept-1' => 'Vegane Brokkolisuppe', 'rezept-2' => 'Pasta Arrabiata'],
+    );
+
+    expect(rezeptBlock(Native::visit('/')))->toBe(['Vegane Brokkolisuppe', 'Pasta Arrabiata']);
+});
+
+it('behält ein Rezept im Block, dessen Artikel schon abgehakt sind', function () {
+    mitMealie(
+        [
+            mealieArtikel('200 g Tomaten', label: 'Gemüse'),
+            mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', abgehakt: true, rezeptIds: ['rezept-1']),
+        ],
+        ['rezept-1' => 'Vegane Brokkolisuppe'],
+    );
+
+    expect(rezeptBlock(Native::visit('/')))->toBe(['Vegane Brokkolisuppe']);
+});
+
+it('lässt den Rezeptblock weg, solange kein Artikel an einem Rezept hängt', function () {
+    mitMealie([mealieArtikel('1 Bund Petersilie', label: 'Gemüse')]);
+
+    expect(rezeptBlockUeberschrift(Native::visit('/')))->toBeNull();
+});
+
+it('zeichnet die Rezeptzeilen mit Besteck-Icon und ohne Checkbox', function () {
+    mitMealie(
+        [mealieArtikel('200 g Tomaten', label: 'Gemüse', rezeptIds: ['rezept-1'])],
+        ['rezept-1' => 'Vegane Brokkolisuppe'],
+    );
+
+    $zeile = knotenMitRef(Native::visit('/', platform: 'android'), 'rezept-'.md5('Vegane Brokkolisuppe'));
+
+    expect($zeile['props']['headline'] ?? null)->toBe('Vegane Brokkolisuppe');
+    expect($zeile['props']['leading_icon'] ?? null)->toBe('restaurant');
+    expect($zeile['props']['leading_type'] ?? null)->not->toBe('checkbox');
 });
 
 it('lädt einen Rezeptnamen nach, der nicht in der Listen-Antwort steht', function () {
@@ -300,13 +420,7 @@ it('lädt einen Rezeptnamen nach, der nicht in der Listen-Antwort steht', functi
         '*/api/recipes/rezept-9' => Http::response(['id' => 'rezept-9', 'name' => 'Pasta Arrabiata']),
     ]);
 
-    Native::visit('/')->assertElement('list_item', fn (array $node) => ($node['props']['supporting'] ?? null) === 'Pasta Arrabiata');
-});
-
-it('lässt eine Zeile ohne Rezeptbezug ohne Untertitel', function () {
-    mitMealie([mealieArtikel('1 Bund Petersilie', label: 'Gemüse')]);
-
-    Native::visit('/')->assertElement('list_item', fn (array $node) => ($node['props']['supporting'] ?? '') === '');
+    expect(rezeptBlock(Native::visit('/')))->toBe(['Pasta Arrabiata']);
 });
 
 it('gibt eigenen Zeilen kein Trailing-Icon', function () {
@@ -1200,12 +1314,14 @@ it('verteilt eine abgelegte Mealie-Antwort auf Katalog-, Alias- und eigene Grupp
     // „Haushalt“ heißt wie eine Katalog-Gruppe und verschmilzt mit ihr,
     // „Tiefkühlware“ landet über die Alias-Tabelle in „Tiefkühl“ — beide an
     // ihrer Katalogposition (Anhang A: … Tiefkühl … Haushalt …). Dahinter die
-    // Gruppen, die es nur wegen Mealie gibt, alphabetisch.
+    // Gruppen, die es nur wegen Mealie gibt, alphabetisch, und ganz zum
+    // Schluss die Rezepte hinter der Liste.
     expect(listenAbschnitte($screen))->toBe([
         ['ueberschrift' => 'Tiefkühl', 'artikel' => ['1 Packung Erbsen']],
         ['ueberschrift' => 'Haushalt', 'artikel' => ['2 Rollen Küchenpapier']],
         ['ueberschrift' => 'Asia-Laden', 'artikel' => ['1 Glas Kimchi']],
         ['ueberschrift' => 'Sonstiges', 'artikel' => ['3 Feuerzeuge']],
+        ['ueberschrift' => 'Verknüpfte Rezepte (1)', 'artikel' => ['Erbsensuppe']],
     ]);
 
     expect(navUntertitel($screen))->toBe('4 Artikel');

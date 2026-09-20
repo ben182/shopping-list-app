@@ -147,6 +147,17 @@ class Einkaufen extends NativeComponent
         return $this->uebersicht()->abgehakte();
     }
 
+    /**
+     * Die Rezepte hinter der Mealie-Liste — der Block unter den Warengruppen.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function rezepte(): array
+    {
+        return $this->uebersicht()->rezepte();
+    }
+
     public function abgehakteAufgeklappt(): bool
     {
         return app(Sitzung::class)->abgehakteAufgeklappt();
@@ -432,10 +443,10 @@ class Einkaufen extends NativeComponent
         return $ergebnis->found() ? (string) $ergebnis->value : null;
     }
 
-    /** Beide Computed-Werte hängen an denselben Daten. */
+    /** Alle drei Computed-Werte hängen an denselben Daten. */
     private function listeNeuZeichnen(): void
     {
-        unset($this->abschnitte, $this->abgehakte);
+        unset($this->abschnitte, $this->abgehakte, $this->rezepte);
     }
 
     private function liste(): EigeneListe

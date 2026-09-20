@@ -45,7 +45,7 @@ final class Uebersicht
             $zeilen[$this->zuordnung->fuerLabel($eintrag->label)][] = new Zeile(
                 $eintrag->id,
                 $eintrag->text,
-                $eintrag->rezepte,
+                $eintrag->notiz,
                 ausMealie: true,
             );
         }
@@ -69,6 +69,31 @@ final class Uebersicht
             fn (Eintrag $eintrag) => new Zeile($eintrag->id, $eintrag->text, null, ausMealie: true),
             $this->mealie->abgehakte(),
         );
+    }
+
+    /**
+     * Die Rezepte, aus denen die Mealie-Liste zusammengetragen wurde — jedes
+     * einmal, in der Reihenfolge, in der die Artikel sie mitbringen. Sie
+     * stehen als eigener Block unter der Liste statt an jeder Zeile: an der
+     * Zeile gehört die Notiz aus Mealie hin, und dieselben vier Rezeptnamen
+     * unter zwanzig Artikeln sind Rauschen.
+     *
+     * Abgehakte Artikel zählen mit — ein Rezept verschwindet nicht, weil
+     * seine Zutaten schon im Wagen liegen.
+     *
+     * @return list<string>
+     */
+    public function rezepte(): array
+    {
+        $namen = [];
+
+        foreach ($this->mealie->alle() as $eintrag) {
+            foreach ($eintrag->rezepte as $name) {
+                $namen[$name] = $name;
+            }
+        }
+
+        return array_values($namen);
     }
 
     /**

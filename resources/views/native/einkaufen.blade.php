@@ -81,7 +81,7 @@
                                 native:key="{{ $zeile->id }}"
                                 ref="mealie-{{ $zeile->id }}"
                                 headline="{{ $zeile->text }}"
-                                :supporting="$zeile->zusatz ?? ''"
+                                :supporting="$zeile->notiz ?? ''"
                                 :leadingCheckbox="false"
                                 :disabled="$banner !== null"
                                 :trailingIconIos="Ios::ForkKnife"
@@ -108,6 +108,29 @@
                 </native:list-section>
             @endforeach
 
+            {{-- Die Rezepte, aus denen Mealie die Liste gefüllt hat — einmal
+                 unter allen Warengruppen statt an jeder Zeile. Die Zeile
+                 selbst trägt jetzt die Notiz aus Mealie. --}}
+            @if ($this->rezepte !== [])
+                <native:list-section header="Verknüpfte Rezepte ({{ count($this->rezepte) }})">
+                    @foreach ($this->rezepte as $rezept)
+                        @php($rezeptSchluessel = md5($rezept))
+                        <native:list-item
+                            native:key="rezept-{{ $rezeptSchluessel }}"
+                            ref="rezept-{{ $rezeptSchluessel }}"
+                            headline="{{ $rezept }}"
+                            :leadingIconIos="Ios::ForkKnife"
+                            :leadingIconAndroid="Android::Restaurant"
+                            :headlineColor="theme('on-surface-variant', '#475569')"
+                        />
+                    @endforeach
+                </native:list-section>
+            @endif
+
+            {{-- Luft am Listenende: sonst klebt die letzte Zeile an der Naht
+                 zum angepinnten Block „Abgehakt“ und liest sich wie seine
+                 erste. --}}
+            <native:column class="w-full h-6" />
         </native:list>
     @endif
 

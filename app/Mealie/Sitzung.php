@@ -124,7 +124,7 @@ final class Sitzung
      * einen vorherigen Fehler ab — das Banner verschwindet damit von selbst,
      * sobald Mealie wieder antwortet.
      *
-     * @param  list<array{id?: string, text?: string, label?: ?string, rezepte?: ?string, abgehakt?: bool, roh?: array<string, mixed>}>  $artikel
+     * @param  list<array{id?: string, text?: string, notiz?: ?string, label?: ?string, rezepte?: list<string>, abgehakt?: bool, roh?: array<string, mixed>}>  $artikel
      */
     public function setzen(array $artikel): void
     {

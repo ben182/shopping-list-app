@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Http;
 final class Einkaufsliste
 {
     /**
-     * @return array{artikel: list<array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool, roh: array<string, mixed>}>}|array{fehler: string}
+     * @return array{artikel: list<array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>}>}|array{fehler: string}
      */
     public static function laden(string $basisUrl, string $token, string $listenId, int $timeout): array
     {
@@ -70,7 +70,7 @@ final class Einkaufsliste
     /**
      * @param  array<string, mixed>  $eintrag
      * @param  array<string, string>  $rezeptnamen
-     * @return array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool, roh: array<string, mixed>}
+     * @return array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>}
      */
     private static function eintrag(array $eintrag, array $rezeptnamen): array
     {
@@ -81,14 +81,49 @@ final class Einkaufsliste
             is_array($eintrag['recipeReferences'] ?? null) ? $eintrag['recipeReferences'] : [],
         ))));
 
+        [$text, $notiz] = self::textUndNotiz($eintrag);
+
         return [
             'id' => (string) ($eintrag['id'] ?? ''),
-            'text' => (string) ($eintrag['display'] ?? ''),
+            'text' => $text,
+            'notiz' => $notiz,
             'label' => is_string($label) && $label !== '' ? $label : null,
-            'rezepte' => $rezepte === [] ? null : implode(' · ', $rezepte),
+            'rezepte' => $rezepte,
             'abgehakt' => (bool) ($eintrag['checked'] ?? false),
             'roh' => $eintrag,
         ];
+    }
+
+    /**
+     * Mealies `display` ist „Menge Einheit Lebensmittel Notiz“ in einem Stück —
+     * samt Bruchzeichen und Plural, die sich aus den Einzelfeldern nicht
+     * verlässlich nachbauen lassen. Statt die Zeile neu zu setzen, wird nur
+     * die Notiz hinten abgeschnitten: sie steht in der App eine Zeile tiefer.
+     *
+     * Artikel ohne Lebensmittel tragen ihren ganzen Text in der Notiz — nach
+     * dem Schnitt bliebe dort nur die Menge stehen. Die bleiben, wie Mealie
+     * sie schreibt.
+     *
+     * @param  array<string, mixed>  $eintrag
+     * @return array{string, ?string}
+     */
+    private static function textUndNotiz(array $eintrag): array
+    {
+        $anzeige = trim((string) ($eintrag['display'] ?? ''));
+        $notiz = trim((string) ($eintrag['note'] ?? ''));
+        $lebensmittel = trim((string) ($eintrag['food']['name'] ?? ''));
+
+        if ($notiz === '' || $lebensmittel === '') {
+            return [$anzeige, null];
+        }
+
+        if (! str_ends_with($anzeige, $notiz)) {
+            return [$anzeige, $notiz];
+        }
+
+        $ohneNotiz = rtrim(mb_substr($anzeige, 0, mb_strlen($anzeige) - mb_strlen($notiz)));
+
+        return $ohneNotiz === '' ? [$anzeige, null] : [$ohneNotiz, $notiz];
     }
 
     /**

@@ -12,7 +12,7 @@ final readonly class Zeile
     public function __construct(
         public string $id,
         public string $text,
-        public ?string $zusatz,
+        public ?string $notiz,
         public bool $ausMealie,
     ) {}
 }
