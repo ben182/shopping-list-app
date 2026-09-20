@@ -121,3 +121,31 @@ function navUntertitel(TestableComponent $screen): ?string
 
     return $untertitel;
 }
+
+/**
+ * Der erste Knoten des Baums mit diesem `ref`. `ref` steht auf Knotenebene,
+ * nicht in `props` — deshalb findet ihn kein `assertElement()`-Matcher über
+ * die Props.
+ *
+ * @return array<string, mixed>|null
+ */
+function knotenMitRef(TestableComponent $screen, string $ref): ?array
+{
+    $treffer = null;
+
+    $walk = function (array $node) use (&$walk, &$treffer, $ref): void {
+        if (($node['ref'] ?? null) === $ref) {
+            $treffer ??= $node;
+
+            return;
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return $treffer;
+}

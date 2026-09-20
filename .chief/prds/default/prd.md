@@ -71,17 +71,18 @@ Prefix: `EKL`.
 - [x] Die Liste ist scrollbar und Inhalte liegen nicht hinter der Tab-Leiste.
 
 ### EKL-004: Vorrat durchsuchen
+**Status:** done
 **Priority:** 4
 **Blocked by:** EKL-002
 **Description:** Als Nutzer möchte ich den Vorrat per Suchfeld filtern, damit ich einen Artikel unter 113 schnell finde.
 
 **Acceptance Criteria:**
-- [ ] Über der Vorrat-Liste sitzt ein natives Suchfeld (`native:outlined-text-input`) mit Lupen-Icon vorn und Platzhalter „Artikel suchen…“; kein Autofokus beim Öffnen des Tabs, keine Autokorrektur oder automatische Großschreibung.
-- [ ] Während der Eingabe filtert die Liste live (Debounce höchstens 250 ms): Ein Artikel bleibt sichtbar, wenn sein Name den eingegebenen Text enthält, unabhängig von Groß-/Kleinschreibung; führende und abschließende Leerzeichen der Eingabe werden ignoriert. Gruppen ohne Treffer verschwinden samt Überschrift.
-- [ ] Sobald das Suchfeld Text enthält, erscheint darin hinten ein Löschen-Button (X-Icon, `a11y-label` „Suche leeren“); Tap leert die Suche und zeigt wieder den kompletten Vorrat.
-- [ ] Gibt es keine Treffer, zeigt der Screen einen Leerzustand mit „Suche ohne Ergebnis“-Icon (`native:icon`) und dem Text „Keine Treffer für „<Eingabe>“.“ mit deutschen Anführungszeichen (öffnend „, schließend “).
-- [ ] Tap auf einen gefilterten Artikel setzt ihn auf die Liste; der Suchtext bleibt erhalten und die Liste zeigt die restlichen Treffer.
-- [ ] Das Suchfeld wird beim Verlassen und erneuten Öffnen des Vorrat-Tabs geleert.
+- [x] Über der Vorrat-Liste sitzt ein natives Suchfeld (`native:outlined-text-input`) mit Lupen-Icon vorn und Platzhalter „Artikel suchen…“; kein Autofokus beim Öffnen des Tabs, keine Autokorrektur oder automatische Großschreibung.
+- [x] Während der Eingabe filtert die Liste live (Debounce höchstens 250 ms): Ein Artikel bleibt sichtbar, wenn sein Name den eingegebenen Text enthält, unabhängig von Groß-/Kleinschreibung; führende und abschließende Leerzeichen der Eingabe werden ignoriert. Gruppen ohne Treffer verschwinden samt Überschrift.
+- [x] Sobald das Suchfeld Text enthält, erscheint darin hinten ein Löschen-Button (X-Icon, `a11y-label` „Suche leeren“); Tap leert die Suche und zeigt wieder den kompletten Vorrat.
+- [x] Gibt es keine Treffer, zeigt der Screen einen Leerzustand mit „Suche ohne Ergebnis“-Icon (`native:icon`) und dem Text „Keine Treffer für „<Eingabe>“.“ mit deutschen Anführungszeichen (öffnend „, schließend “).
+- [x] Tap auf einen gefilterten Artikel setzt ihn auf die Liste; der Suchtext bleibt erhalten und die Liste zeigt die restlichen Treffer.
+- [x] Das Suchfeld wird beim Verlassen und erneuten Öffnen des Vorrat-Tabs geleert.
 
 ### EKL-005: „Alles abhaken“ für eigene Artikel mit Bestätigung
 **Priority:** 5

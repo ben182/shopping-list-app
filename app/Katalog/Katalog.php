@@ -58,6 +58,37 @@ final class Katalog
     }
 
     /**
+     * Aus den übergebenen IDs die, deren Artikelname den Suchbegriff enthält —
+     * ohne Rücksicht auf Groß-/Kleinschreibung. Leerraum am Anfang und Ende des
+     * Begriffs zählt nicht mit, ein leerer Begriff lässt alles durch. Die
+     * Reihenfolge ist wieder die des Katalogs, nicht die der Eingabe.
+     *
+     * @param  list<string>  $artikelIds
+     * @return list<string>
+     */
+    public function gefiltert(array $artikelIds, string $suchbegriff): array
+    {
+        $begriff = trim($suchbegriff);
+
+        if ($begriff === '') {
+            return $artikelIds;
+        }
+
+        $gesucht = array_flip($artikelIds);
+        $treffer = [];
+
+        foreach ($this->gruppen() as $gruppe) {
+            foreach ($gruppe->artikel as $artikel) {
+                if (isset($gesucht[$artikel->id]) && mb_stripos($artikel->name, $begriff) !== false) {
+                    $treffer[] = $artikel->id;
+                }
+            }
+        }
+
+        return $treffer;
+    }
+
+    /**
      * Die übergebenen Artikel, gruppiert und in Katalogreihenfolge sortiert.
      * IDs ohne Katalog-Eintrag fallen weg, ebenso Gruppen, von denen dabei
      * nichts übrig bleibt.

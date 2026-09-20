@@ -49,6 +49,32 @@
   (`gruppen()`, `artikelIds()`, `kennt()`, `gruppiert()`), der Listen-Zustand nur
   über `App\Liste\EigeneListe`. Gespeichert wird ausschließlich die Artikel-ID;
   IDs ohne Katalog-Eintrag werden beim Lesen gefiltert.
+- **Icons in `leading-icon` / `icon`** (Textfeld, Button) sind ein *einzelner*
+  String — die `:iconIos`/`:iconAndroid`-Paare von `native:icon` und `list-item`
+  gibt es dort nicht. Den Namen in der Komponente auswählen
+  (`IconResolver::resolve(null, Ios::X, Android::Y)['icon'] ?? Android::Y->value`)
+  und per `$this->view('name', [...])` ins Blade reichen.
+- **`native:outlined-text-input`:** `@change="handler"` → `public function
+  handler(string $eingabe)`. `sync-mode="debounce"` + `debounce-ms="…"` steuern,
+  wann getippter Text ankommt; `value="{{ $prop }}"` spiegelt den Zustand zurück.
+  Im Harness tippt `->input('<ref>', 'text')`. **`native:model` und `@change`
+  vertragen sich nicht** — beide belegen `_change`.
+- **Trailing-Icons in Textfeldern sind rein dekorativ** (kein `@trailingPress`).
+  Ein Löschen-Knopf muss ein eigenes `native:button` in derselben `native:row`
+  sein. Analog fehlen `autofocus` / `autocorrect` / `autocapitalize` komplett
+  (offene TODOs in `vendor/nativephp/mobile-ui/SHIPPING-CHECKLIST.md` 3.1) —
+  `keyboard="url"` schaltet Autokorrektur und Auto-Großschreibung auf beiden
+  Plattformen ab und ist der Ersatz, bis die Props kommen.
+- **Prop-Namen sind nicht die Attributnamen:** `icon=` am Button landet als
+  `leading_icon`, `a11y-label` als `a11y_label`, `leading-icon` am Textfeld als
+  `leading_icon`. Vor dem Test-Schreiben einmal `dumpTree()` oder die
+  Element-Klasse lesen.
+- **`ref` steht auf Knotenebene, nicht in `props`** — dafür gibt es in
+  `tests/Pest.php` den Helfer `knotenMitRef($screen, 'ref')`.
+- **`follow()` gibt einen *neuen* Harness zurück.** Der alte ist danach
+  „suspended" und wirft bei jeder Interaktion. Also
+  `$neu = $alt->tap('Tab')->assertReplacedWith('/x')->follow();` und ab da nur
+  noch mit `$neu` weiterarbeiten.
 - **Callback mit String-Argument** nie direkt ins Attribut schreiben
   (`@press="tu('{{ $id }}')"` bricht den Validator). Stattdessen
   `@php($press = "tu('{$id}')")` und `@press="{{ $press }}"`.
@@ -265,3 +291,57 @@ Listen-Blade), keine neuen.
   verschwindet der Untertitel, obwohl Mealie-Zeilen sichtbar sind.
 ---
 <!-- chief-timing story="EKL-003" duration_ms=222992 cost=10.644197 in=114 out=413 cache_create=239785 cache_read=4077029 -->
+
+## 2026-09-20 - EKL-004
+
+Der Vorrat-Screen hat jetzt ein Suchfeld über der Liste: `native:outlined-text-input`
+mit Lupe vorn, Platzhalter „Artikel suchen…", Debounce 200 ms. Die Eingabe filtert
+live über `Katalog::gefiltert()` (contains, ohne Rücksicht auf Groß-/Kleinschreibung,
+Begriff getrimmt); weil danach wieder `Katalog::gruppiert()` läuft, fallen Gruppen
+ohne Treffer samt Überschrift von selbst weg. Sobald Text im Feld steht, erscheint
+daneben ein Löschen-Button (X, `a11y-label` „Suche leeren"). Ohne Treffer zeigt der
+Screen „Keine Treffer für „…"." mit `search_off`-Icon. Der Suchtext ist
+Komponenten-Zustand (`public string $suche`) und damit beim nächsten Öffnen des
+Tabs wieder leer.
+
+**Dateien**
+
+- `app/Katalog/Katalog.php` — neue Methode `gefiltert(array $ids, string $begriff)`
+- `app/NativeComponents/Vorrat.php` — `$suche`, `suchen()`, `sucheLeeren()`,
+  `iconName()`; `gruppen()` filtert jetzt zusätzlich
+- `resources/views/native/vorrat.blade.php` — Column/Row-Gerüst, Suchfeld,
+  Löschen-Button, zweiter Leerzustand
+- `tests/Pest.php` — Helfer `knotenMitRef()`
+- `tests/Feature/VorratTest.php` — 11 neue Tests
+
+53 Tests, 369 Assertions, grün. Pint sauber. `native:validate` rot mit 7 statt 6
+„Unknown native element type"-Meldungen — die neue ist `outlined-text-input`,
+also wieder nur ein mobile-ui-Tag, das der Core-Analyzer nicht kennt. Keine
+andere Fehlerart. `native:row` und `native:button` bemängelt er nicht.
+
+**Learnings für die nächsten Iterationen**
+
+- **Was mobile-ui 0.3 beim Textfeld nicht kann:** kein `autofocus`, kein
+  `autocorrect`, kein `autocapitalize`, kein pressbares Trailing-Icon. Die ersten
+  drei stehen als offene Punkte in `vendor/nativephp/mobile-ui/SHIPPING-CHECKLIST.md`
+  (Abschnitt 3.1). Kein Autofokus ist ohnehin das Verhalten ohne Zutun; gegen
+  Autokorrektur/Großschreibung hilft nur die URL-Tastatur (`keyboard="url"`), die
+  beides auf iOS wie Android abschaltet. Ein `<native:button>` in derselben Row
+  ersetzt den Clear-Button im Feld — optisch dicht dran, aber nicht *im* Rahmen.
+- **Zwei Leerzustände brauchen eine Reihenfolge.** „Keine Treffer" muss vor
+  „Alles auf der Liste." geprüft werden, sonst schluckt der alte Zweig den neuen.
+  Unterscheidungsmerkmal ist der *getrimmte* Begriff, nicht `$suche` — bei einer
+  Eingabe aus lauter Leerzeichen filtert nichts, also gilt der alte Zustand.
+- **Getrimmt anzeigen, ungetrimmt speichern.** `$suche` hält die Rohreingabe
+  (sonst erschiene der Löschen-Button bei „   " nicht), die Anführungszeichen im
+  Leerzustand bekommen den getrimmten Begriff.
+- **`->input()` löst den Handler sofort aus**, unabhängig von `debounce-ms`. Der
+  Debounce ist reine Geräteseite; im Test lässt er sich nur als Prop prüfen
+  (`sync_mode`, `debounce_ms`), nicht als Zeitverhalten.
+- Für EKL-005 („Alles abhaken") gilt weiterhin: `EigeneListe` hat keine
+  Bulk-Operation, `alleEntfernen()` müsste neu dazu.
+- Für EKL-007 (Mealie): `Katalog::gefiltert()` arbeitet nur über Katalog-IDs.
+  Mealie-Artikel ohne Katalog-Eintrag fielen durch das Raster — dann braucht die
+  Suche eine zweite Quelle statt einer ID-Filterung.
+---
+<!-- chief-timing story="EKL-004" duration_ms=767403 cost=26.335005 in=252 out=863 cache_create=561040 cache_read=10498000 -->
