@@ -139,6 +139,28 @@
 - **Kein `@if` innerhalb der Attributliste eines `native:`-Tags** (ParseError);
   bedingte Attribute als `:attr="$wert ?? ''"`. `native:button` braucht
   `label="…"` statt Slot-Inhalt.
+- **Ein Singleton wirkt erst, wenn es in `AppServiceProvider::register()` steht.**
+  Ohne den Eintrag gibt `app(X::class)` bei jedem Aufruf eine *neue* Instanz —
+  der `finished()`-Callback schreibt dann in eine Wegwerf-Instanz und der
+  Screen zeichnet leer. Jede neue Sitzungsklasse braucht ihre Zeile dort.
+- **`native:list` verträgt lose Kinder jedes Typs:** der Renderer schickt jedes
+  direkte Kind, das kein `list_section` ist, durch `NodeView`. Eine Überschrift
+  mit eigener Farbe geht deshalb als `native:text` direkt in die Liste —
+  `list-section` hat nur `header`/`footer` und kennt keine Farbe.
+- **`native:pressable` ist der tappbare Container** (Kern-Element wie `row` /
+  `column`, `@press` kommt aus der Element-Basis). Der Collector setzt
+  `a11y-label` generisch für *jedes* Element, auch wenn dessen
+  `applyAttributes()` es gar nicht kennt — also landet es als `props.a11y_label`.
+- **`native:icon` legt den Namen in `props.name`**, nicht in `props.icon`.
+- **Browser-Plugin:** `Browser::open($url)` ruft `nativephp_call('Browser.Open')`
+  und ist damit über `assertNativeCalled('Browser.Open', …)` prüfbar. Der
+  `BrowserServiceProvider` muss in `NativeServiceProvider::plugins()` stehen,
+  sonst fehlt er im nativen Build (`php artisan native:plugin:list` zeigt es).
+- **Wochenplan-Daten:** Laden/Parsen in `App\Wochenplan\Plan` (statisch,
+  serialisierbar für `async`), Woche als Wertobjekt `App\Wochenplan\Woche`
+  (Montag–Sonntag, `text()`, `schluessel()`), Sitzungszustand je Woche im
+  Singleton `App\Wochenplan\Sitzung`, die sieben Tage baut
+  `App\Wochenplan\Uebersicht::tage()`.
 - **`Http::fake()` zweimal aufrufen ersetzt nichts** — für aufeinanderfolgende
   Antworten `Http::fakeSequence('<muster>')->push(…)`.
 
@@ -906,3 +928,76 @@ andere Fehlerart.
   `EigeneListe::anzahl()` nur noch die halbe Wahrheit.
 ---
 <!-- chief-timing story="EKL-010" duration_ms=232285 cost=7.312694 in=72 out=266 cache_create=173663 cache_read=2690322 -->
+
+## 2026-09-20 - EKL-011
+
+Der dritte Tab zeigt den Mealie-Wochenplan. Oben eine Wochen-Navigation aus
+drei `native:pressable` — Pfeil links („Vorherige Woche“), der Wochen-Text
+„KW 39 · 21.09.–27.09.“ (Tap springt zur aktuellen Woche) und Pfeil rechts
+(„Nächste Woche“). Beim Öffnen des Tabs steht die Kalenderwoche des heutigen
+Tages. Geladen wird beim Mounten, beim Wochenwechsel, beim Zurückkehren in
+den Vordergrund (`AppForegrounded`) und per Pull-to-Refresh, jeweils
+`GET /api/households/mealplans?start_date=<Montag>&end_date=<Sonntag>&perPage=100`
+über `async`. Eine Woche, von der die App noch nichts weiß, zeigt währenddessen
+einen zentrierten `native:activity-indicator`; eine schon geladene bleibt stehen.
+
+Darunter alle sieben Tage mit Überschrift „Montag, 21.09.“, der heutige in der
+Primärfarbe und mit dem Zusatz „· Heute“. Jeder Eintrag ist eine
+`native:list-item` mit deutschem Mahlzeitentyp als Overline, Rezeptname als
+Headline und dem Rezeptbild als Leading-Image (ohne Bild das Besteck-Icon);
+Einträge ohne Rezept zeigen `title` und `text` und reagieren nicht auf Tap.
+Sortiert wird je Tag nach Frühstück, Mittag, Abend, Beilage, Snack, Getränk,
+Dessert; ein leerer Tag bekommt eine gedämpfte Zeile „Nichts geplant“. Ein Tap
+auf eine Rezept-Zeile öffnet `…/g/home/r/<slug>` im System-Browser. Ohne Token
+steht statt der Tage ein Leerzustand mit Kalender-Icon, „Mealie nicht
+verbunden“ und dem Knopf „Zu den Einstellungen“.
+
+**Dateien**
+
+- `app/Wochenplan/{Woche,Mahlzeitentyp,Eintrag,Tag,Uebersicht,Plan,Sitzung}.php` — neu
+- `app/NativeComponents/Wochenplan.php`, `resources/views/native/wochenplan.blade.php`
+- `app/Providers/AppServiceProvider.php` — `Wochenplan\Sitzung` als Singleton
+- `app/Providers/NativeServiceProvider.php` — `BrowserServiceProvider` in `plugins()`
+- `composer.json` / `composer.lock` — `nativephp/mobile-browser` ^1.0 (im PRD-Stack vorgesehen)
+- `tests/Feature/WochenplanTest.php` — 22 Tests
+
+171 Tests, 1122 Assertions, grün. Pint sauber. `native:validate` rot mit
+denselben „Unknown native element type“-Meldungen wie zuvor, dazu dieselbe
+Fehlerart für `pressable` und die vier neuen `list-item` — keine andere Art.
+
+**Learnings für die nächsten Iterationen**
+
+- **`native:validate` kennt auch `pressable` nicht**, obwohl das ein
+  Kern-Container ist (`NativeElementCollector::$builtinTypes`, vom Android-
+  `NodeView` gerendert). Der Analyzer-Katalog ist schlicht unvollständig; die
+  Regel „nur prüfen, dass keine *andere* Fehlerart dazukommt“ gilt weiter.
+- **Der Spinner lässt sich nicht über den Netzweg beobachten**, weil
+  `AsyncTask::fake()` inline läuft und der Baum erst danach publiziert wird.
+  Geprüft wird er deshalb über die öffentliche Eigenschaft:
+  `$screen->set('laedt', true)` rendert neu, und `set('montag', '2026-10-05')`
+  wechselt auf eine Woche ohne Daten — genau die Kombination, die ihn zeigt.
+- **Der heutige Tag braucht eine eigene Farbe, ein `list-section` kann das
+  nicht.** Die Tagesüberschriften hängen darum als lose `native:text` in der
+  Liste. Der Renderer mischt das anstandslos; nebenbei entfällt dabei Androids
+  automatisches `uppercase` auf Abschnitts-Headern, das „Montag, 21.09.“
+  zerschrieben hätte.
+- **Die Woche ist ein Wertobjekt, der Screen hält nur ihren Montag als String**
+  (`public string $montag`) — der Zustand geht über die Wire-Grenze, und ein
+  `CarbonImmutable` täte das nicht. `Woche::ausSchluessel()` baut ihn zurück.
+- `startOfWeek()` bekommt `CarbonInterface::MONDAY` ausdrücklich mit: Mealie
+  bekommt `start_date`/`end_date`, und eine locale-abhängige Woche holte die
+  falschen sieben Tage.
+- **Für EKL-012 liegt schon bereit:** `App\Wochenplan\Sitzung::fehlerMelden()`
+  /`fehler()` merkt sich den `App\Mealie\Fehler` des letzten Ladevorgangs,
+  und `App\Mealie\Fehlerzustand` liefert Text und Knopfbeschriftung ohne
+  Bezug zum Einkaufen-Screen. Was fehlt, ist der Cache je Woche (eine zweite
+  Klasse neben `App\Mealie\Cache` auf demselben `MealieCache`-Modell) und
+  das Banner im Blade.
+- **Testhelfer in `tests/Feature/WochenplanTest.php`:** `mitWochenplan()`
+  (Token + gefaktes Mealie + `AsyncTask::fake()`), `mealplanEintrag()` in
+  Mealies echter Form, `wochenplanInhalt()` (Überschriften und Zeilen in
+  Render-Reihenfolge), `wochenplanZeile($screen, $headline)` und
+  `tagesUeberschriften()`. Zeilen werden über ihre Headline gesucht, nicht
+  über `ref` — Mealies IDs sind im Test Rauschen.
+---
+<!-- chief-timing story="EKL-011" duration_ms=734571 cost=30.661304 in=230 out=790 cache_create=460215 cache_read=14646382 -->

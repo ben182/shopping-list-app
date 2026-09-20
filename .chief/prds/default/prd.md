@@ -174,19 +174,20 @@ Prefix: `EKL`.
 - [x] Die Action „Alles abhaken“ ist sichtbar, sobald mindestens ein eigener oder offener Mealie-Artikel vorhanden ist.
 
 ### EKL-011: Wochenplan anzeigen
+**Status:** done
 **Priority:** 11
 **Blocked by:** EKL-006
 **Description:** Als Nutzer möchte ich den Mealie-Wochenplan der aktuellen Woche in der App sehen und in andere Wochen blättern, damit ich weiß, was wir kochen und was ich einkaufen muss.
 
 **Acceptance Criteria:**
-- [ ] Der Wochenplan-Screen zeigt oben eine Wochen-Navigation: Pfeil links, Text „KW n · DD.MM.–DD.MM.“ (Montag bis Sonntag), Pfeil rechts; die Pfeile haben `a11y-label` „Vorherige Woche“ / „Nächste Woche“. Beim Öffnen ist die Kalenderwoche des heutigen Tages gewählt. Ein Tap auf den Wochen-Text springt zur aktuellen Woche zurück.
-- [ ] Beim Öffnen des Tabs, beim Wechsel der Woche, beim Zurückkehren der App in den Vordergrund und per Pull-to-Refresh lädt die App die Einträge der gewählten Woche (`GET /api/households/mealplans?start_date=<Montag>&end_date=<Sonntag>&perPage=100`). Während des Ladens einer Woche ohne Cache zeigt der Inhaltsbereich einen zentrierten `native:activity-indicator`.
-- [ ] Für jeden der 7 Tage erscheint ein Abschnitt mit Überschrift „<Wochentag ausgeschrieben>, DD.MM.“ (z. B. „Montag, 21.09.“). Der heutige Tag ist hervorgehoben (Überschrift in Primärfarbe und Zusatz „Heute“).
-- [ ] Jeder Eintrag ist eine `native:list-item`-Zeile mit dem Mahlzeitentyp als Overline in Deutsch (breakfast → „Frühstück“, lunch → „Mittag“, dinner → „Abend“, side → „Beilage“, snack → „Snack“, drink → „Getränk“, dessert → „Dessert“), dem Rezeptnamen als Headline und dem Rezeptbild als quadratisches Leading-Image (`/api/media/recipes/{recipeId}/images/min-original.webp`); ohne Bild ein Platzhalter-Icon. Einträge ohne Rezept zeigen ihren `title` als Headline und `text` als Supporting-Text, ohne Bild.
-- [ ] Einträge eines Tages sind sortiert: Frühstück, Mittag, Abend, Beilage, Snack, Getränk, Dessert.
-- [ ] Ein Tag ohne Einträge zeigt unter seiner Überschrift eine Zeile in gedämpfter Farbe „Nichts geplant“.
-- [ ] Tap auf einen Eintrag mit Rezept öffnet `https://mealie.example.test/g/home/r/<slug>` im System-Browser (Plugin `nativephp/mobile-browser`). Einträge ohne Rezept reagieren nicht auf Tap.
-- [ ] Ist kein Token hinterlegt, zeigt der Screen statt der Tage einen Leerzustand mit Kalender-Icon, dem Text „Mealie nicht verbunden“ und einem Button „Zu den Einstellungen“.
+- [x] Der Wochenplan-Screen zeigt oben eine Wochen-Navigation: Pfeil links, Text „KW n · DD.MM.–DD.MM.“ (Montag bis Sonntag), Pfeil rechts; die Pfeile haben `a11y-label` „Vorherige Woche“ / „Nächste Woche“. Beim Öffnen ist die Kalenderwoche des heutigen Tages gewählt. Ein Tap auf den Wochen-Text springt zur aktuellen Woche zurück.
+- [x] Beim Öffnen des Tabs, beim Wechsel der Woche, beim Zurückkehren der App in den Vordergrund und per Pull-to-Refresh lädt die App die Einträge der gewählten Woche (`GET /api/households/mealplans?start_date=<Montag>&end_date=<Sonntag>&perPage=100`). Während des Ladens einer Woche ohne Cache zeigt der Inhaltsbereich einen zentrierten `native:activity-indicator`.
+- [x] Für jeden der 7 Tage erscheint ein Abschnitt mit Überschrift „<Wochentag ausgeschrieben>, DD.MM.“ (z. B. „Montag, 21.09.“). Der heutige Tag ist hervorgehoben (Überschrift in Primärfarbe und Zusatz „Heute“).
+- [x] Jeder Eintrag ist eine `native:list-item`-Zeile mit dem Mahlzeitentyp als Overline in Deutsch (breakfast → „Frühstück“, lunch → „Mittag“, dinner → „Abend“, side → „Beilage“, snack → „Snack“, drink → „Getränk“, dessert → „Dessert“), dem Rezeptnamen als Headline und dem Rezeptbild als quadratisches Leading-Image (`/api/media/recipes/{recipeId}/images/min-original.webp`); ohne Bild ein Platzhalter-Icon. Einträge ohne Rezept zeigen ihren `title` als Headline und `text` als Supporting-Text, ohne Bild.
+- [x] Einträge eines Tages sind sortiert: Frühstück, Mittag, Abend, Beilage, Snack, Getränk, Dessert.
+- [x] Ein Tag ohne Einträge zeigt unter seiner Überschrift eine Zeile in gedämpfter Farbe „Nichts geplant“.
+- [x] Tap auf einen Eintrag mit Rezept öffnet `https://mealie.example.test/g/home/r/<slug>` im System-Browser (Plugin `nativephp/mobile-browser`). Einträge ohne Rezept reagieren nicht auf Tap.
+- [x] Ist kein Token hinterlegt, zeigt der Screen statt der Tage einen Leerzustand mit Kalender-Icon, dem Text „Mealie nicht verbunden“ und einem Button „Zu den Einstellungen“.
 
 ### EKL-012: Wochenplan-Cache und Fehlerzustand
 **Priority:** 12

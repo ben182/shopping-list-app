@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Mealie\Sitzung;
+use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -17,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
         // jeder Tab-Wechsel mountet den Einkaufen-Screen neu, und was einmal
         // geladen wurde, soll dabei stehen bleiben.
         $this->app->singleton(Sitzung::class);
+
+        // Dasselbe für den Wochenplan: eine geladene Woche soll beim
+        // Tab-Wechsel nicht wieder hinter einem Spinner verschwinden.
+        $this->app->singleton(Wochenplansitzung::class);
     }
 
     /**
