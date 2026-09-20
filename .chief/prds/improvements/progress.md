@@ -1,6 +1,12 @@
 # Fortschritt — PRD „improvements“
 
 ## Codebase Patterns
+- **Bildquellen liegen als SVG in `resources/grafik/`, gerendert wird per
+  Imagick über `php artisan grafik`.** Der SVG-Renderer von Imagick kann nur
+  `fill`, `rect rx`, Pfade (`M/L/A/Q/Z`) und `transform` an einem `<g>` mit
+  `translate`/`scale` — kein `stroke`, kein `<text>` (es sind null Schriften
+  registriert), kein `transform` an einem `<rect>`, kein `rotate` um einen
+  Mittelpunkt. Runde Enden also über Halbkreis-Bögen, Schrift als Pfad.
 
 - **Sprache durchgängig Deutsch.** Klassen-, Methoden- und Variablennamen,
   Kommentare, Commit-Messages, Testnamen — alles auf Deutsch. Fachbegriffe
@@ -466,3 +472,94 @@ bleibt unberührt.
   nichts geändert.
 ---
 <!-- chief-timing story="FEIN-006" duration_ms=272555 cost=8.170659 in=92 out=373 cache_create=167214 cache_read=3337361 -->
+
+## 2026-09-20 - FEIN-007
+
+**Was umgesetzt wurde**
+
+Ein eigenes Motiv — eine Liste mit drei abgehakten Einträgen — als einzige
+SVG-Quelle, dazu ein Splash-Layout mit demselben Motiv über dem Schriftzug
+„Einkaufsliste". Das Kommando `php artisan grafik` rendert daraus per Imagick
+`public/icon.png` (1024 × 1024, weißes Motiv auf Indigo `#4F46E5`, kein
+Alphakanal) und sechs Splash-PNGs (hell `#F8FAFC`/`#4F46E5`/`#0F172A`, dunkel
+`#0F172A`/`#818CF8`/`#F8FAFC`, je 1×/2×/3× von 1280 × 1920). Alle PNGs sind
+eingecheckt. `--ziel` schreibt woandershin, damit der Test in ein Temp-
+Verzeichnis rendern kann.
+
+**Geänderte Dateien**
+
+- `resources/grafik/motiv.svg` — das Motiv, viewBox auf den Außenkanten
+- `resources/grafik/splash.svg` — das Layout, mit `<!--motiv-->` als Einsatzstelle
+- `app/Console/Commands/GrafikCommand.php` — Kommando `grafik`
+- `public/icon.png`, `splash.png`, `splash@2x.png`, `splash@3x.png`,
+  `splash-dark.png`, `splash-dark@2x.png`, `splash-dark@3x.png`
+- `tests/Feature/GrafikTest.php` — sieben Fälle über die eingecheckten Dateien
+  plus ein Kommandotest
+
+**Learnings for future iterations:**
+
+- **Imagick rendert SVG mit seinem internen MSVG-Renderer, und der kann fast
+  nichts.** `queryFormats('*SVG*')` meldet MSVG/SVG/SVGZ, aber es gibt kein
+  librsvg-Delegate und `Imagick::queryFonts('*')` liefert **null** Schriften.
+  Konkret ausprobiert: `<text>` wird komplett weggelassen; `stroke` zeichnet
+  weder in der angegebenen Farbe noch in der angegebenen Breite (ein `<line>`
+  kommt als schwarzes Haar heraus, ein `<path fill="none" stroke="…">` gar
+  nicht); `transform` an einem `<rect>` wird ignoriert; `rotate(a cx cy)` dreht
+  trotzdem um den Ursprung. Was **funktioniert**: `fill` (auch vererbt von
+  `<svg>`/`<g>`), `<rect rx>`, Pfade mit `M/L/A/Q/Z`, und `transform` an einem
+  `<g>` mit `translate(x y) scale(s)`. Also: alles als gefüllte Pfade bauen,
+  runde Enden über Halbkreis-Bögen (`A r r 0 0 0 …`), platzieren nur über
+  `<g transform>`.
+- **Schrift im Bild heißt Schrift als Pfad.** Der Schriftzug wurde einmalig mit
+  `fontTools` (venv in `/tmp`) aus Roboto Medium (Apache 2.0, geholt über die
+  Google-Fonts-CSS-API) in Umrisse umgewandelt und liegt jetzt als `<path>` in
+  `splash.svg`. Kein Font im Repo, keine Laufzeitabhängigkeit.
+- **Das Icon darf kein einziges durchsichtiges Pixel haben.** NativePHP prüft in
+  `InstallsAppIcon::validateIosIcon()` sieben Stichproben auf Alpha und wirft
+  das Icon sonst kommentarlos weg — genauso bei „nicht quadratisch" und
+  „< 1024". Deshalb `setImageAlphaChannel(ALPHACHANNEL_REMOVE)` plus
+  `setImageFormat('png24')`.
+- **„Loading…" verschwindet von allein.** `MainActivity.kt` zeichnet
+  `SplashText()` nur, wenn `splashResourceId == 0` — also nur, solange kein
+  Splash-Drawable existiert. Es gibt in dieser Paketversion keinen Schalter
+  dafür und keine Splash-Hintergrundfarbe in der Config.
+- **Android skaliert den Splash auf genau 1280 × 1920 hoch (xxxhdpi) und
+  zeichnet ihn mit `ContentScale.Crop`.** Auf einem 9:19,5-Telefon bleibt die
+  volle Höhe und rund 68 % der Breite stehen — die 60-%-Regel aus der PRD hat
+  also Luft. Quelle größer als 1280 × 1920 bringt auf Android nichts, die
+  iOS-Varianten brauchen es trotzdem.
+- **Ein Test, der nur Maße prüft, prüft zu wenig.** Die Mutation „Motiv nicht in
+  das Splash-Layout einsetzen" lief zuerst grün durch: Der Schriftzug allein
+  liegt immer noch innerhalb der mittleren 60 %. Erst die Prüfung auf den
+  **Mittelpunkt** des belegten Bereichs (ohne Motiv rutscht er in die untere
+  Hälfte) macht sie rot. Zweite Mutation: Motiv auf 80 % der Icon-Kante
+  aufblasen → der Sicherheitsbereich-Test schlägt an.
+- **Der Motiv-Anteil im Kommando (0,62) und die Grenze im Test (0,66) sind mit
+  Absicht verschieden.** Bei exakt 66 % liegen die weichgezeichneten Randpixel
+  genau auf der Grenze und der Test wird flackerig; außerdem wirkt ein
+  randvolles Icon im Launcher gedrängt.
+- **GD frisst Speicher: Ein 3840 × 5760 großes PNG kostet 88 MB.** Zwei davon in
+  einem Suite-Lauf sprengen das 256-MB-Limit. Pixelprüfungen deshalb nur auf den
+  1×-Dateien; für Existenz und Maße reicht `getimagesize()`, das nichts
+  dekodiert.
+- **Offen und außerhalb des Repos:** `nativephp/…/drawable/ic_launcher_background.xml`
+  kommt als weiße Fläche aus der Paketvorlage und lässt sich nicht über die
+  Config setzen. Das Adaptive Icon legt unser fertiges Icon zu 69 % auf diese
+  weiße Fläche. Im Emulator ist das als heller Ring um die Indigo-Scheibe zu
+  sehen, weil der Pixel-Launcher eine größere Maske als die 72 dp der Norm
+  benutzt. Der Ordner ist gitignoriert und wird bei `native:install`
+  neu geschrieben — gehört also zu FEIN-008, nicht hierher.
+- **Auf dem Emulator verifiziert** (`Pixel_7_API_35`, Debug-Build über
+  `native:run`; Icon und Splash entstehen in `native:install` unabhängig vom
+  Build-Typ). Screenshot-Serie beim Kaltstart zeigt in Hell wie in Dunkel das
+  Splash-Bild im passenden Modus und kein „Loading…"; auf dem Homescreen steht
+  das neue Icon. Ein Screenshot-Burst ist hier das Mittel der Wahl — der Splash
+  steht keine halbe Sekunde, ein einzelner `screencap` trifft ihn nicht:
+  `adb shell "am force-stop …; am start -n …/com.nativephp.mobile.ui.MainActivity"`,
+  danach sechsmal `screencap` hintereinander. Dunkelmodus schalten über
+  `adb shell cmd uimode night yes|no`.
+- Zusatz zur Kontrolle: Unsere Dateien bestehen NativePHPs eigene Validierungen
+  (`validateIosIcon`, `validateSplashImage`), werden beim Build also nicht
+  stillschweigend übersprungen.
+---
+<!-- chief-timing story="FEIN-007" duration_ms=1232291 cost=53.598769 in=430 out=1352 cache_create=766445 cache_read=26080050 -->

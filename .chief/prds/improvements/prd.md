@@ -107,19 +107,20 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Ein fehlgeschlagenes Laden räumt nichts auf.
 
 ### FEIN-007: Eigenes App-Icon und Splash Screen
+**Status:** done
 **Priority:** 7
 **Description:** Als Nutzer möchte ich beim Start und auf dem Homescreen ein eigenes Motiv sehen statt eines schwarzen Bildschirms und des Paket-Standard-Icons.
 
 **Acceptance Criteria:**
-- [ ] Motiv: eine stilisierte Liste mit abgehakten Einträgen (Haken). Icon und Splash nutzen dasselbe Motiv.
-- [ ] Icon: weißes Motiv auf Indigo-Fläche (`#4F46E5`), quadratisch, mindestens 1024 × 1024 px, liegt als `public/icon.png`. Das Motiv liegt vollständig im inneren Bereich von 66 % der Kantenlänge, damit es beim Android-Adaptive-Icon (rund, abgerundet, Squircle) nicht angeschnitten wird.
-- [ ] Splash hell (`public/splash.png`): Hintergrund im hellen App-Hintergrund `#F8FAFC`, Motiv in Indigo `#4F46E5`, darunter der Schriftzug „Einkaufsliste" in der hellen On-Surface-Farbe. Größe 1280 × 1920 px (Hochformat 2:3).
-- [ ] Splash dunkel (`public/splash-dark.png`): Hintergrund im dunklen App-Hintergrund `#0F172A`, Motiv in hellem Indigo `#818CF8`, Schriftzug in der dunklen On-Surface-Farbe. Gleiche Größe.
-- [ ] Motiv und Schriftzug sind auf dem Splash zentriert und liegen innerhalb der mittleren 60 % von Breite und Höhe, weil NativePHP das Bild bildschirmfüllend zuschneidet (Crop).
-- [ ] Zusätzlich liegen die iOS-Varianten `splash@2x.png`, `splash@3x.png`, `splash-dark@2x.png`, `splash-dark@3x.png` in `public/`.
-- [ ] Die Quellen sind SVG-Dateien im Repo (ein Motiv, ein Splash-Layout). Ein Artisan-Kommando (`--no-interaction`-fähig) rendert daraus per Imagick alle oben genannten PNGs nach `public/`. Die PNGs werden trotzdem eingecheckt, damit der Build nicht von Imagick abhängt.
-- [ ] Ein Test prüft, dass alle genannten Dateien existieren, PNG sind und die Mindestmaße einhalten (Icon ≥ 1024 quadratisch, Splash ≥ 1280 × 1920).
-- [ ] Nach einem Release-Build zeigt die installierte App beim Start das Splash-Bild passend zum aktiven Modus, ohne „Loading…"-Text, und auf dem Homescreen das neue Icon.
+- [x] Motiv: eine stilisierte Liste mit abgehakten Einträgen (Haken). Icon und Splash nutzen dasselbe Motiv.
+- [x] Icon: weißes Motiv auf Indigo-Fläche (`#4F46E5`), quadratisch, mindestens 1024 × 1024 px, liegt als `public/icon.png`. Das Motiv liegt vollständig im inneren Bereich von 66 % der Kantenlänge, damit es beim Android-Adaptive-Icon (rund, abgerundet, Squircle) nicht angeschnitten wird.
+- [x] Splash hell (`public/splash.png`): Hintergrund im hellen App-Hintergrund `#F8FAFC`, Motiv in Indigo `#4F46E5`, darunter der Schriftzug „Einkaufsliste" in der hellen On-Surface-Farbe. Größe 1280 × 1920 px (Hochformat 2:3).
+- [x] Splash dunkel (`public/splash-dark.png`): Hintergrund im dunklen App-Hintergrund `#0F172A`, Motiv in hellem Indigo `#818CF8`, Schriftzug in der dunklen On-Surface-Farbe. Gleiche Größe.
+- [x] Motiv und Schriftzug sind auf dem Splash zentriert und liegen innerhalb der mittleren 60 % von Breite und Höhe, weil NativePHP das Bild bildschirmfüllend zuschneidet (Crop).
+- [x] Zusätzlich liegen die iOS-Varianten `splash@2x.png`, `splash@3x.png`, `splash-dark@2x.png`, `splash-dark@3x.png` in `public/`.
+- [x] Die Quellen sind SVG-Dateien im Repo (ein Motiv, ein Splash-Layout). Ein Artisan-Kommando (`--no-interaction`-fähig) rendert daraus per Imagick alle oben genannten PNGs nach `public/`. Die PNGs werden trotzdem eingecheckt, damit der Build nicht von Imagick abhängt.
+- [x] Ein Test prüft, dass alle genannten Dateien existieren, PNG sind und die Mindestmaße einhalten (Icon ≥ 1024 quadratisch, Splash ≥ 1280 × 1920).
+- [x] Nach einem Release-Build zeigt die installierte App beim Start das Splash-Bild passend zum aktiven Modus, ohne „Loading…"-Text, und auf dem Homescreen das neue Icon.
 
 ### FEIN-008: Framework-Reste entfernen
 **Priority:** 8

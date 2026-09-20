@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Das Motiv der App: eine Liste, deren drei Einträge abgehakt sind.
+
+  Alles ist gefüllt, nichts gestrichen: Der SVG-Renderer von Imagick zeichnet
+  `stroke` weder in der angegebenen Farbe noch in der angegebenen Breite und
+  setzt `transform` an einem `<rect>` an die falsche Stelle. `fill` und
+  Pfad-Bögen kann er dagegen. Jeder Haken besteht darum aus zwei ausgefüllten
+  Kapseln — dieselbe Form wie die Balken daneben, nur schräg: zwei Halbkreise
+  (`A 5 5`) um die Endpunkte, verbunden durch die beiden Seitenlinien.
+
+  Die Eckpunkte eines Hakens sind (5,16) → (16,27) → (33,5), je Zeile um 40
+  nach unten versetzt; die Kapselbreite ist 10, also derselbe Wert wie die
+  Balkenhöhe.
+
+  Die viewBox liegt exakt auf den Außenkanten der Zeichnung, damit das Rendern
+  nur skalieren und schieben muss. `#4F46E5` ist der Vorgabewert der einen
+  Farbe — `GrafikCommand` tauscht ihn je Ziel gegen Weiß oder Hell-Indigo.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 124 112" width="124" height="112" fill="#4F46E5">
+  <path d="M1.46 19.54 L12.46 30.54 A5 5 0 0 0 19.54 23.46 L8.54 12.46 A5 5 0 0 0 1.46 19.54Z"/>
+  <path d="M19.96 30.06 L36.96 8.06 A5 5 0 0 0 29.04 1.94 L12.04 23.94 A5 5 0 0 0 19.96 30.06Z"/>
+  <rect x="52" y="11" width="72" height="10" rx="5"/>
+
+  <path d="M1.46 59.54 L12.46 70.54 A5 5 0 0 0 19.54 63.46 L8.54 52.46 A5 5 0 0 0 1.46 59.54Z"/>
+  <path d="M19.96 70.06 L36.96 48.06 A5 5 0 0 0 29.04 41.94 L12.04 63.94 A5 5 0 0 0 19.96 70.06Z"/>
+  <rect x="52" y="51" width="54" height="10" rx="5"/>
+
+  <path d="M1.46 99.54 L12.46 110.54 A5 5 0 0 0 19.54 103.46 L8.54 92.46 A5 5 0 0 0 1.46 99.54Z"/>
+  <path d="M19.96 110.06 L36.96 88.06 A5 5 0 0 0 29.04 81.94 L12.04 103.94 A5 5 0 0 0 19.96 110.06Z"/>
+  <rect x="52" y="91" width="64" height="10" rx="5"/>
+</svg>
