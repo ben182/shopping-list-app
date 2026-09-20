@@ -1,6 +1,7 @@
 <?php
 
 use App\Liste\EigeneListe;
+use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Testing\Native;
 
 /*
@@ -118,4 +119,71 @@ it('beschriftet auch die gefüllte Liste für Screenreader', function () {
     aufDieListe('tofu', 'salz');
 
     Native::visit('/', platform: 'android')->assertAccessible();
+});
+
+it('zeigt die Action „Alles abhaken“ nur, solange mindestens ein Artikel offen ist', function () {
+    Native::visit('/')->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
+
+    aufDieListe('tofu');
+
+    Native::visit('/')->assertElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
+});
+
+it('fragt vor dem Abhaken mit einem nativen Dialog nach', function () {
+    aufDieListe('tofu', 'hummus', 'salz');
+
+    Native::visit('/')
+        ->press('alleAbhakenBestaetigen')
+        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['title'] === 'Alles abhaken?'
+            && $params['message'] === '3 Artikel wandern zurück in den Vorrat.'
+            && collect($params['buttons'])->map(fn ($button) => is_array($button) ? $button['label'] : $button)->all() === ['Abbrechen', 'Abhaken']);
+});
+
+it('zählt im Dialogtext den einen Artikel im Singular', function () {
+    aufDieListe('tofu');
+
+    Native::visit('/')
+        ->press('alleAbhakenBestaetigen')
+        ->assertNativeCalled('Dialog.Alert', fn (array $params) => $params['message'] === '1 Artikel wandert zurück in den Vorrat.');
+});
+
+it('schickt nach „Abhaken“ alle Artikel zurück in den Vorrat', function () {
+    aufDieListe('tofu', 'hummus', 'salz');
+
+    Native::visit('/')
+        ->press('alleAbhakenBestaetigen')
+        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken'])
+        ->assertSee('Liste ist leer.')
+        ->assertSee('Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.')
+        ->assertMissingElement('list_item')
+        ->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
+
+    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
+        ->flatMap(fn (array $abschnitt) => $abschnitt['artikel']);
+
+    expect($vorrat)->toContain('Tofu', 'Hummus', 'Salz')->toHaveCount(112);
+});
+
+it('lässt die Liste nach „Abbrechen“ unverändert', function () {
+    aufDieListe('tofu', 'salz');
+
+    $screen = Native::visit('/')
+        ->press('alleAbhakenBestaetigen')
+        ->emitNative(ButtonPressed::class, ['index' => 0, 'label' => 'Abbrechen']);
+
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
+        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
+    ]);
+});
+
+it('lässt die Liste unverändert, wenn der Dialog ohne Button geschlossen wird', function () {
+    aufDieListe('tofu', 'salz');
+
+    $screen = Native::visit('/')->press('alleAbhakenBestaetigen');
+
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
+        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
+    ]);
 });

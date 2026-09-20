@@ -82,6 +82,19 @@
   kein `Artisan::call('migrate')`, kein `db:seed` — Startdaten in eine
   Migration. Nach einer neuen Migration braucht es `native:run`, PHP-Hot-Reload
   reicht nicht.
+- **Native Dialoge** über `Dialog::alert($titel, $text, $buttons)`; Buttons als
+  String oder `['label' => …, 'style' => 'default'|'cancel'|'destructive']`. Das
+  Ergebnis kommt als `->buttonPressed(fn (ButtonPressed $e) => …)` zurück, die
+  Closure wird an die lebende Komponente gebunden. `show()` ist optional — der
+  Destruktor zeigt den Dialog. Im Test: `assertNativeCalled('Dialog.Alert', …)`
+  und `->emitNative(ButtonPressed::class, ['index' => …, 'label' => …])`; ohne
+  `id` im Payload korreliert der einzige offene Callback der Event-Klasse.
+- **`navigationOptions()` wird bei jedem Render neu ausgewertet** — bedingte
+  Top-Bar-Actions gehören dorthin. `NavBarOptions::action()` ist additiv, die
+  Aufrufreihenfolge ist die Reihenfolge in der Bar; Knotentyp im Baum ist
+  `top_bar_action` mit `props.a11y_label`.
+- **Gruppenreihenfolge im Katalog:** Obst & Gemüse, Brot & Backwaren, Kühlregal,
+  Tiefkühl, Lebensmittel, Getränke, Haushalt, Drogerie.
 
 ---
 
@@ -345,3 +358,60 @@ andere Fehlerart. `native:row` und `native:button` bemängelt er nicht.
   Suche eine zweite Quelle statt einer ID-Filterung.
 ---
 <!-- chief-timing story="EKL-004" duration_ms=767403 cost=26.335005 in=252 out=863 cache_create=561040 cache_read=10498000 -->
+
+## 2026-09-20 - EKL-005
+
+Der Einkaufen-Screen hat eine zweite Top-Bar-Action bekommen: Häkchen-Icon
+(`checkmark.circle` / `done_all`) mit `a11y-label` „Alles abhaken“, links vom
+Zahnrad und nur sichtbar, solange `EigeneListe::anzahl() > 0`. Ihr Tap öffnet
+`Dialog::alert('Alles abhaken?', …, ['Abbrechen' (cancel), 'Abhaken' (default)])`;
+der Text ist singular- bzw. pluralrichtig („1 Artikel wandert…“ / „n Artikel
+wandern…“). Die Bestätigung hängt an `->buttonPressed()`: nur das Label
+„Abhaken“ räumt über die neue `EigeneListe::alleEntfernen()` ab, danach greift
+der Leerzustand aus EKL-003 und die Action verschwindet mit. „Abbrechen“ und
+ein Dialog ohne Button-Event lassen alles stehen.
+
+**Dateien**
+
+- `app/NativeComponents/Einkaufen.php` — `navigationOptions()` baut die Actions
+  jetzt bedingt, neue Methode `alleAbhakenBestaetigen()`
+- `app/Liste/EigeneListe.php` — `alleEntfernen()`
+- `tests/Feature/EinkaufenTest.php` — 6 neue Tests
+
+59 Tests, 409 Assertions, grün. Pint sauber. `native:validate` unverändert rot
+mit denselben 7 „Unknown native element type“-Meldungen wie nach EKL-004, keine
+neuen.
+
+**Learnings für die nächsten Iterationen**
+
+- **Native Dialoge sind im Harness voll testbar**, ohne eigenen Seam:
+  `->press('handler')` löst ihn aus, `assertNativeCalled('Dialog.Alert', fn ($params) => …)`
+  prüft `title` / `message` / `buttons` / `id` / `event` auf der Wire-Ebene, und
+  `->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Abhaken'])`
+  spielt den Tap im Dialog zurück. Ein Dialog, der ohne Button weggeht, ist
+  schlicht „kein `emitNative`“ — auch das ein Test.
+- **Ohne `id` im `emitNative`-Payload greift die Fallback-Korrelation**
+  (`NativeCallbacks::resolveByEvent`): ein einziger offener Callback pro
+  Event-Klasse genügt. Die Alert-ID ist eine frische UUID pro Aufruf, sie im
+  Test zu beschaffen wäre unnötige Kopplung.
+- **`PendingAlert::__destruct()` zeigt den Dialog von selbst.** `->show()` ist
+  optional; `Dialog::alert(…)->buttonPressed(…)` als Statement reicht. Wer das
+  Objekt in einer Variablen festhält, verzögert damit die Anzeige bis zum Ende
+  des Scopes.
+- **Buttons entweder als String oder als `['label' => …, 'style' => …]`**
+  (`default` / `cancel` / `destructive`). Ein unbekannter Style wirft schon im
+  Konstruktor. Die Unterscheidung im Callback läuft über `$event->label`, nicht
+  über `$event->index` — das Label steht auch im Akzeptanzkriterium.
+- **`navigationOptions()` wird bei jedem Render neu ausgewertet**, taugt also
+  für bedingte Actions. `NavBarOptions::action()` ist fluent und additiv; die
+  Reihenfolge der `action()`-Aufrufe ist die Reihenfolge in der Bar.
+- **Gruppenreihenfolge im Katalog:** Obst & Gemüse, Brot & Backwaren,
+  **Kühlregal**, Tiefkühl, Lebensmittel, Getränke, Haushalt, Drogerie. Kühlregal
+  steht *vor* Lebensmittel — in `listenAbschnitte()`-Erwartungen leicht verdreht.
+- Für EKL-007 (Mealie): `alleAbhakenBestaetigen()` zählt und räumt nur die
+  eigenen Artikel. Sobald Mealie-Zeilen auf dem Screen stehen, müssen die
+  Sichtbarkeitsbedingung der Action, die Zahl im Dialogtext und das Abräumen
+  gemeinsam auf „alle offenen Artikel“ umgestellt werden — dieselbe Stelle wie
+  `navSubtitle()` und der Leerzustand.
+---
+<!-- chief-timing story="EKL-005" duration_ms=236214 cost=12.414086 in=144 out=509 cache_create=235748 cache_read=5302317 -->

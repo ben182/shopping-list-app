@@ -66,4 +66,14 @@ final class EigeneListe
     {
         ListenArtikel::query()->whereKey($artikelId)->delete();
     }
+
+    /**
+     * Räumt die Liste komplett leer — alles zurück in den Vorrat. Auch IDs,
+     * die der Katalog nicht mehr kennt, verschwinden dabei; sie zählten
+     * nirgends mit und hätten sonst für immer in der Tabelle gelegen.
+     */
+    public function alleEntfernen(): void
+    {
+        ListenArtikel::query()->delete();
+    }
 }

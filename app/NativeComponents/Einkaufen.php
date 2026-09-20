@@ -12,6 +12,8 @@ use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\Layouts\Builders\NavAction;
 use Native\Mobile\Edge\Layouts\Builders\NavBarOptions;
 use Native\Mobile\Edge\NativeComponent;
+use Native\Mobile\Events\Alert\ButtonPressed;
+use Native\Mobile\Facades\Dialog;
 
 class Einkaufen extends NativeComponent
 {
@@ -32,18 +34,29 @@ class Einkaufen extends NativeComponent
     }
 
     /**
-     * Der einzige Weg zu den Einstellungen, der von überall erreichbar ist:
-     * das Zahnrad rechts in der Top-Bar des Start-Screens.
+     * Rechts in der Top-Bar: „Alles abhaken“, solange es etwas abzuhaken gibt,
+     * und das Zahnrad — der einzige Weg zu den Einstellungen, der von überall
+     * erreichbar ist.
      */
     public function navigationOptions(): ?NavBarOptions
     {
-        return NavBarOptions::make()
-            ->action(
-                NavAction::make('einstellungen')
-                    ->icon(ios: Ios::Gearshape, android: Android::Settings)
-                    ->a11yLabel('Einstellungen')
-                    ->press('oeffneEinstellungen')
+        $optionen = NavBarOptions::make();
+
+        if ($this->liste()->anzahl() > 0) {
+            $optionen->action(
+                NavAction::make('alles-abhaken')
+                    ->icon(ios: Ios::CheckmarkCircle, android: Android::DoneAll)
+                    ->a11yLabel('Alles abhaken')
+                    ->press('alleAbhakenBestaetigen')
             );
+        }
+
+        return $optionen->action(
+            NavAction::make('einstellungen')
+                ->icon(ios: Ios::Gearshape, android: Android::Settings)
+                ->a11yLabel('Einstellungen')
+                ->press('oeffneEinstellungen')
+        );
     }
 
     /**
@@ -63,6 +76,40 @@ class Einkaufen extends NativeComponent
         $this->liste()->entfernen($artikelId);
 
         unset($this->gruppen);
+    }
+
+    /**
+     * Zwei Taps bis zur leeren Liste: Der Dialog fragt nach, und erst sein
+     * „Abhaken“ räumt ab. Jeder andere Ausgang — „Abbrechen“, Wegtippen,
+     * Zurück-Geste — lässt die Liste stehen, weil dann entweder kein Event
+     * kommt oder eines mit einem anderen Label.
+     */
+    public function alleAbhakenBestaetigen(): void
+    {
+        $anzahl = $this->liste()->anzahl();
+
+        if ($anzahl === 0) {
+            return;
+        }
+
+        Dialog::alert(
+            'Alles abhaken?',
+            $anzahl === 1
+                ? '1 Artikel wandert zurück in den Vorrat.'
+                : $anzahl.' Artikel wandern zurück in den Vorrat.',
+            [
+                ['label' => 'Abbrechen', 'style' => 'cancel'],
+                ['label' => 'Abhaken', 'style' => 'default'],
+            ]
+        )->buttonPressed(function (ButtonPressed $event): void {
+            if ($event->label !== 'Abhaken') {
+                return;
+            }
+
+            $this->liste()->alleEntfernen();
+
+            unset($this->gruppen);
+        });
     }
 
     public function oeffneEinstellungen(): void

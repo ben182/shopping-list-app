@@ -85,15 +85,16 @@ Prefix: `EKL`.
 - [x] Das Suchfeld wird beim Verlassen und erneuten Öffnen des Vorrat-Tabs geleert.
 
 ### EKL-005: „Alles abhaken“ für eigene Artikel mit Bestätigung
+**Status:** done
 **Priority:** 5
 **Blocked by:** EKL-003
 **Description:** Als Nutzer möchte ich nach dem Einkauf alle eigenen Artikel mit zwei Taps zurück in den Vorrat schicken, damit die Liste wieder leer ist.
 
 **Acceptance Criteria:**
-- [ ] Die Top-Bar des Einkaufen-Screens zeigt eine Action „Alles abhaken“ (Text-Action oder Icon mit `a11y-label` „Alles abhaken“) nur dann, wenn mindestens ein Artikel auf dem Screen offen ist.
-- [ ] Tap öffnet einen nativen Bestätigungsdialog (`Dialog::alert`) mit Titel „Alles abhaken?“, dem Text „1 Artikel wandert zurück in den Vorrat.“ bei genau einem bzw. „n Artikel wandern zurück in den Vorrat.“ bei mehreren, und den Buttons „Abbrechen“ und „Abhaken“.
-- [ ] „Abhaken“ entfernt alle eigenen Artikel von der Liste; der Screen zeigt danach den Leerzustand aus EKL-003, der Vorrat zeigt alle Artikel.
-- [ ] „Abbrechen“ oder Schließen des Dialogs verändert nichts.
+- [x] Die Top-Bar des Einkaufen-Screens zeigt eine Action „Alles abhaken“ (Text-Action oder Icon mit `a11y-label` „Alles abhaken“) nur dann, wenn mindestens ein Artikel auf dem Screen offen ist.
+- [x] Tap öffnet einen nativen Bestätigungsdialog (`Dialog::alert`) mit Titel „Alles abhaken?“, dem Text „1 Artikel wandert zurück in den Vorrat.“ bei genau einem bzw. „n Artikel wandern zurück in den Vorrat.“ bei mehreren, und den Buttons „Abbrechen“ und „Abhaken“.
+- [x] „Abhaken“ entfernt alle eigenen Artikel von der Liste; der Screen zeigt danach den Leerzustand aus EKL-003, der Vorrat zeigt alle Artikel.
+- [x] „Abbrechen“ oder Schließen des Dialogs verändert nichts.
 
 ### EKL-006: SecureStorage-Plugin und Einstellungen-Screen für das Mealie-Token
 **Priority:** 6
