@@ -116,6 +116,43 @@ function listenAbschnitte(TestableComponent $screen): array
     return $abschnitte;
 }
 
+/**
+ * Die Typen aller Knoten eines Teilbaums, den Wurzelknoten eingeschlossen.
+ *
+ * @return list<string>
+ */
+function knotenTypen(array $node): array
+{
+    $typen = [];
+
+    $walk = function (array $node) use (&$walk, &$typen): void {
+        $typen[] = $node['type'] ?? '';
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($node);
+
+    return $typen;
+}
+
+/**
+ * Tippt die Checkbox vorn an einer Listenzeile an — nicht die Zeile. Das
+ * Gerät schickt dafür ein Checkbox-Event an `on_leading_change`; `check()`
+ * des Harness sucht nur `on_change` und fände die Zeile deshalb nicht.
+ */
+function checkboxAntippen(TestableComponent $screen, string $ref, bool $wert = true): TestableComponent
+{
+    return $screen->fireEvent(
+        $ref,
+        TestableComponent::EVENT_CHECKBOX_CHANGE,
+        ['value' => $wert],
+        ['on_leading_change'],
+    );
+}
+
 /** Der Untertitel, den die Top-Bar ans Gerät schickt. */
 function navUntertitel(TestableComponent $screen): ?string
 {

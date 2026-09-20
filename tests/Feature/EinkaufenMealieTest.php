@@ -116,20 +116,24 @@ function mitMealie(array $artikel, array $rezepte = [], int $aenderungsStatus = 
 }
 
 /**
- * Die Zeilen, die direkt in der Liste stehen statt in einem Abschnitt — der
- * Block „Abgehakt“ am Ende, samt seiner Überschriftszeile.
+ * Die Zeilen des angepinnten Blocks „Abgehakt“ über der Tab-Leiste, samt
+ * seiner Überschriftszeile — in Render-Reihenfolge, Kopf zuerst.
  *
  * @return list<array<string, mixed>>
  */
 function abgehaktBlock(TestableComponent $screen): array
 {
-    $liste = null;
+    $block = knotenMitRef($screen, 'abgehakt-block');
 
-    $walk = function (array $node) use (&$walk, &$liste): void {
-        if (($node['type'] ?? null) === 'list') {
-            $liste ??= $node;
+    if ($block === null) {
+        return [];
+    }
 
-            return;
+    $zeilen = [];
+
+    $walk = function (array $node) use (&$walk, &$zeilen): void {
+        if (($node['type'] ?? null) === 'list_item') {
+            $zeilen[] = $node;
         }
 
         foreach ($node['children'] ?? [] as $child) {
@@ -137,12 +141,9 @@ function abgehaktBlock(TestableComponent $screen): array
         }
     };
 
-    $walk($screen->tree());
+    $walk($block);
 
-    return array_values(array_filter(
-        $liste['children'] ?? [],
-        fn (array $knoten) => ($knoten['type'] ?? null) === 'list_item',
-    ));
+    return $zeilen;
 }
 
 /**
@@ -550,6 +551,27 @@ it('sammelt abgehakte Mealie-Artikel eingeklappt am Ende der Liste', function ()
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 });
 
+it('hängt den Block „Abgehakt“ unter die scrollende Liste statt hinein', function () {
+    mitMealie([
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse'),
+        mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true),
+    ]);
+
+    $screen = Native::visit('/')->tap('Abgehakt (1)');
+
+    // Läge der Block in der Liste, scrollte er mit ihr weg — und die letzte
+    // Zeile der Gruppe darüber ginge optisch in seine Überschrift über.
+    $block = knotenMitRef($screen, 'abgehakt-block');
+
+    expect($block)->not->toBeNull();
+    expect(knotenTypen($block))->not->toContain('list_section');
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Milch']);
+
+    // Die Artikel der Liste bleiben, wo sie waren.
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+});
+
 it('lässt den Abschnitt „Abgehakt“ weg, solange nichts abgehakt ist', function () {
     mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
@@ -611,6 +633,32 @@ it('holt eine angetippte abgehakte Zeile zurück in ihre Gruppe und meldet es Me
 
     Http::assertSent(fn ($anfrage) => $anfrage->method() === 'PUT'
         && $anfrage->url() === 'https://mealie.example.test/api/households/shopping/items/milch-1'
+        && $anfrage['checked'] === false);
+});
+
+it('hakt einen Mealie-Artikel auch dann ab, wenn nur seine Checkbox getroffen wird', function () {
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1')]);
+
+    $screen = checkboxAntippen(Native::visit('/'), 'mealie-brokkoli-1');
+
+    expect(listenAbschnitte($screen))->toBe([]);
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
+
+    Http::assertSent(fn ($anfrage) => $anfrage->method() === 'PUT'
+        && $anfrage->url() === 'https://mealie.example.test/api/households/shopping/items/brokkoli-1'
+        && $anfrage['checked'] === true);
+});
+
+it('holt einen abgehakten Artikel über seine Checkbox zurück in seine Gruppe', function () {
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true, id: 'milch-1')]);
+
+    $screen = checkboxAntippen(Native::visit('/')->tap('Abgehakt (1)'), 'abgehakt-milch-1', false);
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['1 Liter Milch']]]);
+    expect(abgehaktZeilen($screen))->toBe([]);
+
+    Http::assertSent(fn ($anfrage) => $anfrage->method() === 'PUT'
         && $anfrage['checked'] === false);
 });
 

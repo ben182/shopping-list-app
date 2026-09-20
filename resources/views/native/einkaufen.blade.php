@@ -54,9 +54,9 @@
     @endif
 
     @if ($this->abschnitte === [])
-        {{-- Bleibt der Abschnitt „Abgehakt“ darunter stehen, teilt er sich den
-             Platz mit dem Leerzustand, statt ihn zu verdrängen. --}}
-        <native:column class="w-full {{ $this->abgehakte === [] ? 'flex-1' : 'py-10' }} items-center justify-center gap-3 px-8">
+        {{-- Füllt den Platz zwischen Banner und dem angepinnten Block
+             „Abgehakt“ — der sitzt unten und nimmt ihn nicht mehr ein. --}}
+        <native:column class="w-full flex-1 items-center justify-center gap-3 px-8">
             <native:icon :ios="Ios::Cart" :android="Android::ShoppingCart" :size="48" class="text-theme-on-surface-variant" />
             <native:text class="text-center text-base text-theme-on-surface">Liste ist leer.</native:text>
             <native:text class="text-center text-sm text-theme-on-surface-variant">
@@ -65,7 +65,7 @@
         </native:column>
     @endif
 
-    @if ($this->abschnitte !== [] || $this->abgehakte !== [])
+    @if ($this->abschnitte !== [])
         <native:list separator on-refresh="neuLaden" class="w-full flex-1 bg-theme-background">
             @foreach ($this->abschnitte as $abschnitt)
                 {{-- Die Überschrift hängt am Abschnitt: fällt der Abschnitt weg, fällt sie mit. --}}
@@ -88,6 +88,7 @@
                                 :trailingIconAndroid="Android::Restaurant"
                                 trailing-a11y-label="aus Mealie"
                                 @press="{{ $umschalten }}"
+                                on-leading-change="{{ $umschalten }}"
                             />
                         @else
                             {{-- Der Handler-Aufruf steht in einer Variablen, weil ein Argument in
@@ -100,29 +101,44 @@
                                 headline="{{ $zeile->text }}"
                                 :leadingCheckbox="false"
                                 @press="{{ $abhaken }}"
+                                on-leading-change="{{ $abhaken }}"
                             />
                         @endif
                     @endforeach
                 </native:list-section>
             @endforeach
 
-            {{-- Der Abschnitt „Abgehakt“ hängt ohne `list-section` am Ende der
-                 Liste: seine Überschrift muss tappbar sein, und die eines
-                 Abschnitts ist es nicht. --}}
-            @if ($this->abgehakte !== [])
-                @php($aufgeklappt = $this->abgehakteAufgeklappt())
-                @php($chevronIos = $aufgeklappt ? Ios::ChevronUp : Ios::ChevronDown)
-                @php($chevronAndroid = $aufgeklappt ? Android::ExpandLess : Android::ExpandMore)
-                <native:list-item
-                    ref="abgehakt-kopf"
-                    headline="Abgehakt ({{ count($this->abgehakte) }})"
-                    :trailingIconIos="$chevronIos"
-                    :trailingIconAndroid="$chevronAndroid"
-                    trailing-a11y-label="{{ $aufgeklappt ? 'Zuklappen' : 'Aufklappen' }}"
-                    @press="abgehakteUmklappen"
-                />
+        </native:list>
+    @endif
 
-                @if ($aufgeklappt)
+    {{-- „Abgehakt“ sitzt fest über der Tab-Leiste statt am Ende der Liste:
+         so bleibt er erreichbar, ohne durch die ganze Liste zu scrollen, und
+         liest sich nicht mehr als letzte Zeile der Gruppe darüber. Er hängt
+         ohne `list-section` an der Column, weil seine Überschrift tappbar
+         sein muss — die eines Abschnitts ist es nicht. --}}
+    @if ($this->abgehakte !== [])
+        @php($aufgeklappt = $this->abgehakteAufgeklappt())
+        @php($chevronIos = $aufgeklappt ? Ios::ChevronUp : Ios::ChevronDown)
+        @php($chevronAndroid = $aufgeklappt ? Android::ExpandLess : Android::ExpandMore)
+        <native:column ref="abgehakt-block" class="w-full bg-theme-surface">
+            {{-- Die Naht zur Liste darüber. `border-t` kennt der Parser nicht,
+                 seitenweise Ränder gibt es nicht — also eine Haarlinie. --}}
+            <native:column class="w-full h-px bg-theme-outline-variant" />
+
+            <native:list-item
+                ref="abgehakt-kopf"
+                headline="Abgehakt ({{ count($this->abgehakte) }})"
+                :trailingIconIos="$chevronIos"
+                :trailingIconAndroid="$chevronAndroid"
+                trailing-a11y-label="{{ $aufgeklappt ? 'Zuklappen' : 'Aufklappen' }}"
+                @press="abgehakteUmklappen"
+            />
+
+            @if ($aufgeklappt)
+                {{-- Gedeckelt statt flex-1: aufgeklappt wächst der Block nach
+                     oben, soll aber nicht die ganze Liste verdrängen. Die
+                     Zeilen scrollen innerhalb dieser Höhe. --}}
+                <native:list separator class="w-full max-h-80 bg-theme-surface">
                     @foreach ($this->abgehakte as $zeile)
                         @php($umschalten = "mealieUmschalten('{$zeile->id}')")
                         {{-- Gedämpft über den Theme-Wert der aktuellen
@@ -136,10 +152,11 @@
                             :disabled="$banner !== null"
                             :headlineColor="theme('on-surface-variant', '#475569')"
                             @press="{{ $umschalten }}"
+                            on-leading-change="{{ $umschalten }}"
                         />
                     @endforeach
-                @endif
+                </native:list>
             @endif
-        </native:list>
+        </native:column>
     @endif
 </native:column>

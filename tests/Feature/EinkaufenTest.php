@@ -57,6 +57,15 @@ it('schickt einen angetippten Artikel sofort zurück in den Vorrat', function ()
     expect($vorrat)->toContain('Tofu')->not->toContain('Hummus');
 });
 
+it('schickt einen Artikel auch dann zurück in den Vorrat, wenn nur seine Checkbox getroffen wird', function () {
+    aufDieListe('tofu', 'hummus');
+
+    $screen = checkboxAntippen(Native::visit('/'), 'einkaufen-tofu');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Hummus']]]);
+});
+
 it('zeigt einen im Vorrat hinzugefügten Artikel beim Tab-Wechsel an seiner Katalogposition', function () {
     aufDieListe('bananen', 'kartoffeln');
 
