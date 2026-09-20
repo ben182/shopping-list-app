@@ -54,6 +54,10 @@
   `style`-Key — das ist das Mittel für „unsichtbar in Hell und Dunkel“.
   `native:column` darf direktes Kind einer `native:list` sein und ist hier
   das Muster für Abstandhalter am Listenende (`ref="listenende"`).
+- **Caches mit Wegwerf-Logik räumen an der Sitzung auf, nicht am Cache.**
+  `Cache::speichern()` bleibt dumm, `Sitzung::setzen()` ruft danach
+  `aufraeumen()`. Nur so lässt sich im Test ein gewachsener Altbestand
+  herstellen, der dann aufgeräumt wird.
 - **Zustand über einen Handler-Aufruf hinaus braucht `singleton()`** in
   `AppServiceProvider::register()`. `app(X::class)` liefert sonst jedes Mal
   eine frische Instanz, und das Geschriebene ist beim nächsten Render weg.
@@ -406,3 +410,59 @@ Leerzustände rendern gar keine Liste und damit auch keine Luft.
   nichts geändert.
 ---
 <!-- chief-timing story="FEIN-005" duration_ms=314981 cost=12.541151 in=146 out=473 cache_create=198923 cache_read=5849120 -->
+
+## 2026-09-20 - FEIN-006
+
+**Was umgesetzt wurde**
+
+Nach jedem erfolgreichen Laden einer Woche räumt der Wochenplan seinen
+Zwischenspeicher auf: Alle gecachten Wochen, deren Montag mehr als vier Wochen
+vor oder nach dem Montag der aktuellen Kalenderwoche liegt, fallen weg — es
+bleiben höchstens neun. Die gerade geladene Woche bleibt in jedem Fall stehen,
+auch wenn der Nutzer weit aus dem Fenster geblättert hat. Ein gescheitertes
+Laden räumt nichts auf, und die Einkaufslisten-Zeile in derselben Tabelle
+bleibt unberührt.
+
+**Geänderte Dateien**
+
+- `app/Wochenplan/Cache.php` — `aufraeumen(string $behalten)` plus die
+  Konstante `FENSTER = 4`
+- `app/Wochenplan/Sitzung.php` — `setzen()` ruft nach `speichern()` das
+  `aufraeumen()`
+- `tests/Feature/WochenplanTest.php` — vier Fälle (Beispiel aus der Story,
+  geladene Woche außerhalb des Fensters, fehlgeschlagenes Laden,
+  Einkaufsliste), dazu die Helfer `wochenplanImCache()` und
+  `wochenplanBlaettern()`
+
+**Learnings for future iterations:**
+
+- **Das Aufräumen gehört in `Sitzung::setzen()`, nicht in `Cache::speichern()`.**
+  Sonst kann ein Test keinen „alten, gewachsenen Cache" mehr herstellen: jedes
+  Schreiben räumte sofort auf, und die vier Wochen aus dem Beispiel der Story
+  liegen 15 Wochen auseinander — über den Screen ist dieser Zustand also
+  grundsätzlich nicht erreichbar, egal in welcher Reihenfolge oder mit welchem
+  `setTestNow` man blättert. Arrange über die öffentliche API der Cache-Klasse
+  (`wochenplanImCache()`), Assert weiter über `Native::visit()`.
+- **Die Cache-Schlüssel sind `wochenplan:Y-m-d`** — der Textvergleich in SQL
+  ordnet sie deshalb genauso wie der Kalender, ein Datums-`where` braucht keine
+  Konvertierung. Das `where('schluessel', 'like', 'wochenplan:%')` ist trotzdem
+  Pflicht, sonst fiele `einkaufsliste` (lexikografisch davor) mit weg.
+- **Mutationstest statt Bauchgefühl.** Drei gezielte Mutationen am fertigen
+  Code (`whereKeyNot` weg, LIKE-Präfix weg, `aufraeumen()` zusätzlich im
+  Fehlerpfad) haben je genau den zuständigen neuen Test rot gemacht — ein
+  billiger Beweis, dass keiner der Fälle nur zufällig grün ist. Bei
+  Lösch-Features lohnt sich das, weil „nichts passiert" leicht mit „das
+  Richtige passiert" verwechselt wird.
+- **Zwei Sitzungen, zwei Neustarts.** Ein „App-Neustart" im Test ist
+  `app()->forgetInstance(...)` — Wochenplan und Einkaufen haben getrennte
+  Singletons (`App\Wochenplan\Sitzung`, `App\Mealie\Sitzung`), ein Test über
+  beide Tabs muss beide vergessen.
+- **Tests in anderen Dateien sind keine Bibliothek.** `mealieArtikel()` und
+  `appNeuStarten()` stehen in `EinkaufenMealieTest.php`; wer sie in
+  `WochenplanTest.php` bräuchte, nimmt stattdessen `jsonFixture(
+  'mealie-einkaufsliste.json')` und `assertSee()` — sonst hängt der Lauf einer
+  einzelnen Datei an der Ladereihenfolge. Nur `tests/Pest.php` ist geteilt.
+- **Nicht auf dem Emulator verifiziert** — an der nativen Hälfte hat sich
+  nichts geändert.
+---
+<!-- chief-timing story="FEIN-006" duration_ms=272555 cost=8.170659 in=92 out=373 cache_create=167214 cache_read=3337361 -->

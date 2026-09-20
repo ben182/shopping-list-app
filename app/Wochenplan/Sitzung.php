@@ -45,7 +45,8 @@ final class Sitzung
 
     /**
      * Eine frisch geladene Woche. Sie räumt zugleich den Fehlerzustand ab:
-     * wenn Mealie antwortet, ist der Grund von vorhin erledigt.
+     * wenn Mealie antwortet, ist der Grund von vorhin erledigt — und den
+     * Cache, in dem sonst jede je aufgeschlagene Woche liegen bliebe.
      *
      * @param  list<array<string, mixed>>  $eintraege
      */
@@ -58,6 +59,7 @@ final class Sitzung
         $this->fehler = null;
 
         $this->cache->speichern($schluessel, $eintraege);
+        $this->cache->aufraeumen($schluessel);
     }
 
     public function fehlerMelden(Fehler $fehler): void

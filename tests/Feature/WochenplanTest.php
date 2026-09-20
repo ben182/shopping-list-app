@@ -1,5 +1,7 @@
 <?php
 
+use App\Mealie\Sitzung as Mealiesitzung;
+use App\Wochenplan\Cache as Wochenplancache;
 use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Ben182\AppLifecycle\Events\AppForegrounded;
 use Carbon\CarbonImmutable;
@@ -758,4 +760,141 @@ it('baut aus einer abgelegten Mealie-Antwort die ganze Woche', function () {
         ->and(wochenplanZeile($screen, 'Tiramisu')['props']['overline'] ?? null)->toBe('Dessert')
         ->and(wochenplanZeile($screen, 'Lasagne')['props']['overline'] ?? null)->toBe('Abend')
         ->and(wochenplanZeile($screen, 'Essen gehen')['props']['supporting'] ?? null)->toBe('Bei Luigi um 19 Uhr');
+});
+
+/*
+ * Ab hier: das Aufräumen des Wochenplan-Caches (FEIN-006).
+ */
+
+/**
+ * Eine Woche in den Zwischenspeicher legen, ohne sie zu laden — ein Stand,
+ * den der Nutzer irgendwann einmal aufgeschlagen hat. Über den Screen ist so
+ * ein Cache nicht herzustellen: jedes Laden räumt ja gerade auf.
+ */
+function wochenplanImCache(string $montag, string $datum, string $rezept): void
+{
+    app(Wochenplancache::class)->speichern($montag, [[
+        'id' => 'gecacht-'.md5($rezept),
+        'datum' => $datum,
+        'typ' => 'dinner',
+        'rezeptName' => $rezept,
+        'rezeptSlug' => 'gecacht-'.md5($rezept),
+        'rezeptId' => null,
+        'hatBild' => false,
+        'titel' => '',
+        'text' => '',
+    ]]);
+}
+
+/** Vom Montag der aktuellen Kalenderwoche aus blättern; negativ heißt zurück. */
+function wochenplanBlaettern(TestableComponent $screen, int $wochen): TestableComponent
+{
+    $screen->press('aktuelleWoche');
+
+    for ($schritt = 0; $schritt < abs($wochen); $schritt++) {
+        $screen->press($wochen < 0 ? 'vorherigeWoche' : 'naechsteWoche');
+    }
+
+    return $screen;
+}
+
+it('löscht beim Laden die Wochen, die mehr als vier Wochen von der aktuellen entfernt liegen', function () {
+    // Heute ist der 20.09.2026 (KW 38, Montag der 14.09.).
+    CarbonImmutable::setTestNow('2026-09-20 10:00:00');
+
+    wochenplanImCache('2026-07-20', '2026-07-22', 'Sommersalat');
+    wochenplanImCache('2026-08-17', '2026-08-19', 'Ratatouille');
+    wochenplanImCache('2026-09-21', '2026-09-23', 'Kürbissuppe');
+    wochenplanImCache('2026-11-02', '2026-11-04', 'Grünkohl');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-14' => [mealplanEintrag('2026-09-16', 'dinner', 'Lasagne')],
+    ]);
+
+    Native::visit('/wochenplan');
+
+    wochenplanNeuStarten();
+    $ausfall();
+
+    $screen = Native::visit('/wochenplan');
+
+    // Acht Wochen zurück (20.07.) und sieben nach vorn (02.11.): gelöscht.
+    expect(wochenplanZeile(wochenplanBlaettern($screen, -8), 'Sommersalat'))->toBeNull();
+    $screen->assertSee('Wochenplan konnte nicht geladen werden');
+
+    expect(wochenplanZeile(wochenplanBlaettern($screen, 7), 'Grünkohl'))->toBeNull();
+    $screen->assertSee('Wochenplan konnte nicht geladen werden');
+
+    // Vier Wochen zurück (17.08.) und eine nach vorn (21.09.): geblieben.
+    expect(wochenplanZeile(wochenplanBlaettern($screen, -4), 'Ratatouille'))->not->toBeNull()
+        ->and(wochenplanZeile(wochenplanBlaettern($screen, 1), 'Kürbissuppe'))->not->toBeNull();
+});
+
+it('behält die gerade geladene Woche, auch wenn sie weit außerhalb des Fensters liegt', function () {
+    CarbonImmutable::setTestNow('2026-09-20 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-10-19' => [mealplanEintrag('2026-10-21', 'dinner', 'Kartoffelgratin')],
+        '2026-11-02' => [mealplanEintrag('2026-11-04', 'dinner', 'Grünkohl')],
+    ]);
+
+    // Sieben Wochen nach vorn geblättert (02.11.); unterwegs wird jede Woche
+    // geladen und gecacht, darunter der 19.10.
+    wochenplanBlaettern(Native::visit('/wochenplan'), 7);
+
+    wochenplanNeuStarten();
+    $ausfall();
+
+    $screen = Native::visit('/wochenplan');
+
+    expect(wochenplanZeile(wochenplanBlaettern($screen, 7), 'Grünkohl'))->not->toBeNull();
+
+    // Der 19.10. lag beim letzten Laden außerhalb des Fensters und war nicht
+    // die aufgeschlagene Woche.
+    expect(wochenplanZeile(wochenplanBlaettern($screen, 5), 'Kartoffelgratin'))->toBeNull();
+    $screen->assertSee('Wochenplan konnte nicht geladen werden');
+});
+
+it('räumt nach einem fehlgeschlagenen Laden nichts auf', function () {
+    CarbonImmutable::setTestNow('2026-09-20 10:00:00');
+
+    wochenplanImCache('2026-07-20', '2026-07-22', 'Sommersalat');
+
+    $ausfall = wochenplanAntwortetDannNicht(['2026-09-14' => []]);
+    $ausfall();
+
+    Native::visit('/wochenplan');
+
+    wochenplanNeuStarten();
+
+    expect(wochenplanZeile(wochenplanBlaettern(Native::visit('/wochenplan'), -8), 'Sommersalat'))
+        ->not->toBeNull();
+});
+
+it('lässt beim Aufräumen die gecachte Einkaufsliste in derselben Tabelle in Ruhe', function () {
+    CarbonImmutable::setTestNow('2026-09-20 10:00:00');
+
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    $ausfall = false;
+
+    Http::fake(function (Request $anfrage) use (&$ausfall) {
+        if ($ausfall) {
+            throw new ConnectionException('Zeitüberschreitung');
+        }
+
+        return str_contains($anfrage->url(), '/mealplans')
+            ? Http::response(['items' => []])
+            : Http::response(jsonFixture('mealie-einkaufsliste.json'));
+    });
+
+    Native::visit('/');
+    Native::visit('/wochenplan');
+
+    app()->forgetInstance(Mealiesitzung::class);
+    wochenplanNeuStarten();
+    $ausfall = true;
+
+    Native::visit('/')->assertSee('1 Glas Kimchi');
 });

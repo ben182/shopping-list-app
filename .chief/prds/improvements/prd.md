@@ -94,16 +94,17 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Der Abstand ist in Hell und Dunkel unsichtbar (nimmt die Hintergrundfarbe an) und fällt nicht als Block auf.
 
 ### FEIN-006: Wochenplan-Cache aufräumen
+**Status:** done
 **Priority:** 6
 **Description:** Als Nutzer möchte ich, dass die App auf dem Gerät nicht für immer alte Wochen aufhebt, damit die Datenbank klein bleibt.
 
 **Acceptance Criteria:**
-- [ ] Nach jedem erfolgreichen Laden einer Woche werden alle gecachten Wochen gelöscht, deren Montag mehr als vier Wochen vor oder mehr als vier Wochen nach dem Montag der aktuellen Kalenderwoche liegt (Bezug: heutiges Datum zum Zeitpunkt des Ladens). Es bleiben also höchstens neun Wochen.
-- [ ] Die gerade geladene Woche wird nie gelöscht, auch wenn sie außerhalb des Fensters liegt (sie ist ja gerade aufgeschlagen).
-- [ ] Die Einkaufslisten-Zeile in derselben Tabelle bleibt unberührt.
-- [ ] Beispiel: Heute ist der 20.09.2026 (KW 38). Gecacht sind die Wochen mit Montag 20.07., 17.08., 21.09. und 02.11. Nach einem erfolgreichen Laden von KW 38 sind 20.07. und 02.11. gelöscht, 17.08. und 21.09. bleiben.
-- [ ] Beobachtbar: Blättere ich nach dem Aufräumen und einem App-Neustart ohne Mealie-Verbindung in eine gelöschte Woche, zeigt sie das Banner und den Leerzustand „keine gecachte Woche" statt alter Einträge.
-- [ ] Ein fehlgeschlagenes Laden räumt nichts auf.
+- [x] Nach jedem erfolgreichen Laden einer Woche werden alle gecachten Wochen gelöscht, deren Montag mehr als vier Wochen vor oder mehr als vier Wochen nach dem Montag der aktuellen Kalenderwoche liegt (Bezug: heutiges Datum zum Zeitpunkt des Ladens). Es bleiben also höchstens neun Wochen.
+- [x] Die gerade geladene Woche wird nie gelöscht, auch wenn sie außerhalb des Fensters liegt (sie ist ja gerade aufgeschlagen).
+- [x] Die Einkaufslisten-Zeile in derselben Tabelle bleibt unberührt.
+- [x] Beispiel: Heute ist der 20.09.2026 (KW 38). Gecacht sind die Wochen mit Montag 20.07., 17.08., 21.09. und 02.11. Nach einem erfolgreichen Laden von KW 38 sind 20.07. und 02.11. gelöscht, 17.08. und 21.09. bleiben.
+- [x] Beobachtbar: Blättere ich nach dem Aufräumen und einem App-Neustart ohne Mealie-Verbindung in eine gelöschte Woche, zeigt sie das Banner und den Leerzustand „keine gecachte Woche" statt alter Einträge.
+- [x] Ein fehlgeschlagenes Laden räumt nichts auf.
 
 ### FEIN-007: Eigenes App-Icon und Splash Screen
 **Priority:** 7
