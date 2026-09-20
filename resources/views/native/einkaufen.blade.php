@@ -129,8 +129,12 @@
 
             {{-- Luft am Listenende: sonst klebt die letzte Zeile an der Naht
                  zum angepinnten Block „Abgehakt“ und liest sich wie seine
-                 erste. --}}
-            <native:column class="w-full h-6" />
+                 erste. Fehlt der Block, steht darunter nur die Tab-Leiste —
+                 dann braucht es eine ganze Zeilenhöhe, damit die letzte Zeile
+                 frei über ihr steht. Ohne eigene Farbe: der Hintergrund der
+                 Liste steht durch. --}}
+            @php($luft = $this->abgehakte === [] ? 'h-14' : 'h-6')
+            <native:column ref="listenende" class="w-full {{ $luft }}" />
         </native:list>
     @endif
 

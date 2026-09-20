@@ -333,3 +333,38 @@ function knotenMitRefPraefix(TestableComponent $screen, string $praefix): array
 
     return $treffer;
 }
+
+/**
+ * Die Luft am Ende der scrollbaren Liste: der letzte Knoten der Liste, wenn
+ * er der Abstandhalter ist — sonst `null`. So prüft ein Test in einem Zug,
+ * dass es ihn gibt und dass er wirklich ganz unten hängt.
+ *
+ * @return array<string, mixed>|null
+ */
+function listenLuft(TestableComponent $screen): ?array
+{
+    $liste = null;
+
+    $walk = function (array $node) use (&$walk, &$liste): void {
+        if ($liste !== null) {
+            return;
+        }
+
+        if (($node['type'] ?? null) === 'list') {
+            $liste = $node;
+
+            return;
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    $kinder = $liste['children'] ?? [];
+    $letzter = $kinder === [] ? null : $kinder[array_key_last($kinder)];
+
+    return ($letzter['ref'] ?? null) === 'listenende' ? $letzter : null;
+}

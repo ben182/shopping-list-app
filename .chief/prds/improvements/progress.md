@@ -48,6 +48,12 @@
 - **Was nativ gefärbt wird, steht nicht im Wire-Tree.** Tab-Leiste, Buttons
   und Checkboxen tragen dort keine Farbe — der Seam dafür ist
   `Theme::get('light.primary')` nach einem `Native::visit()`.
+- **Tailwind-Maße stehen in `node['layout']`, Farben in `node['style']`.**
+  `h-14` → `layout.height === 56.0` (float!), Skala in
+  `TailwindParser::SPACING`. Ein Knoten ohne Farbklasse hat gar keinen
+  `style`-Key — das ist das Mittel für „unsichtbar in Hell und Dunkel“.
+  `native:column` darf direktes Kind einer `native:list` sein und ist hier
+  das Muster für Abstandhalter am Listenende (`ref="listenende"`).
 - **Zustand über einen Handler-Aufruf hinaus braucht `singleton()`** in
   `AppServiceProvider::register()`. `app(X::class)` liefert sonst jedes Mal
   eine frische Instanz, und das Geschriebene ist beim nächsten Render weg.
@@ -342,3 +348,61 @@ Kreuz.
   nichts geändert.
 ---
 <!-- chief-timing story="FEIN-004" duration_ms=580167 cost=22.985644 in=180 out=673 cache_create=401633 cache_read=10267900 -->
+
+## 2026-09-20 - FEIN-005
+
+**Was umgesetzt wurde**
+
+Am Ende jeder scrollbaren Liste steht jetzt ein Abstandhalter von einer
+Listenzeilenhöhe (56 dp), damit die letzte Zeile beim vollständigen Scrollen
+frei über der Tab-Leiste steht statt an ihr zu kleben: im Vorrat unter der
+letzten Warengruppe, im Wochenplan unter dem Sonntags-Block, im
+Einkaufen-Tab unter der Liste — dort aber nur, solange kein Block „Abgehakt“
+darunter sitzt. Mit dem Block bleibt es bei der schmalen Luft von 24 dp, die
+die Naht zu ihm markiert. Der Abstandhalter trägt weder Fläche noch Rand noch
+Inhalt; der Hintergrund der Liste steht durch, hell wie dunkel. Die
+Leerzustände rendern gar keine Liste und damit auch keine Luft.
+
+**Geänderte Dateien**
+
+- `resources/views/native/vorrat.blade.php`,
+  `resources/views/native/wochenplan.blade.php` — je ein
+  `<native:column ref="listenende" class="w-full h-14" />` als letztes Kind
+  der Liste
+- `resources/views/native/einkaufen.blade.php` — der bestehende Abstandhalter
+  bekommt ein `ref` und eine bedingte Höhe (`h-14` ohne, `h-6` mit dem Block
+  „Abgehakt“)
+- `tests/Pest.php` — `listenLuft()`: der letzte Knoten der ersten Liste im
+  Baum, wenn er der Abstandhalter ist
+- `tests/Feature/VorratTest.php`, `tests/Feature/WochenplanTest.php`,
+  `tests/Feature/EinkaufenTest.php`, `tests/Feature/EinkaufenMealieTest.php`
+  — je ein Fall für die Luft, die Leerzustands-Tests um „kein `listenende`“
+  ergänzt; `wochenplanInhalt()` überspringt textlose Knoten
+- `tests/Feature/ThemeTest.php` — ein Fall, der den Abstandhalter farblos und
+  leer festnagelt
+
+**Learnings for future iterations:**
+
+- **Tailwind-Maße landen in `node['layout']`, nicht in `node['style']`.**
+  `h-14` → `layout.height === 56.0` (float, nicht int — `toBe(56)` scheitert).
+  Die Skala steht in `TailwindParser::SPACING`; `style` hält nur Farben,
+  deshalb sieht `farbPaare()` einen reinen Abstandhalter gar nicht.
+- **Ein Knoten ohne Farbklasse ist im Wire-Tree farblos** — kein `style`-Key,
+  kein Eintrag in `farbPaare()`. Für „unsichtbar in Hell und Dunkel“ ist das
+  das Mittel der Wahl: keine Farbe schlägt zwei gepflegte Farben.
+- **`native:column` ist als direktes Kind einer `native:list` erlaubt**, auch
+  neben `list-section`-Geschwistern — der Weg für einen Abstandhalter am
+  Listenende. Es gäbe auch `native:spacer`, in dieser App ist die leere
+  Column das etablierte Muster.
+- **Ein neues Kind der Liste bricht Helfer, die alle Listenkinder aufzählen.**
+  `wochenplanInhalt()` hängte den textlosen Abstandhalter als
+  `['text' => null]` an und ließ den großen Wochen-Test auflaufen. Wer so
+  einen Helfer hat, filtert Knoten ohne Inhalt heraus, statt die Erwartung im
+  Test um einen `null`-Eintrag zu erweitern.
+- **Leerzustände prüft man am besten in den vorhandenen Leerzustands-Tests**
+  statt in einem eigenen Dataset: „sieht unverändert aus“ heißt genau, dass
+  dort eine Zeile mehr steht und sonst nichts.
+- **Nicht auf dem Emulator verifiziert** — an der nativen Hälfte hat sich
+  nichts geändert.
+---
+<!-- chief-timing story="FEIN-005" duration_ms=314981 cost=12.541151 in=146 out=473 cache_create=198923 cache_read=5849120 -->

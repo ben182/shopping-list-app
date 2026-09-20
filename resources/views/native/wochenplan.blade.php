@@ -125,6 +125,11 @@
                     />
                 @endforelse
             @endforeach
+
+            {{-- Luft am Listenende: sonst klebt der Sonntag beim
+                 Durchscrollen an der Tab-Leiste. Eine Zeilenhöhe, ohne eigene
+                 Farbe — der Hintergrund der Liste steht durch. --}}
+            <native:column ref="listenende" class="w-full h-14" />
         </native:list>
     @endif
 </native:column>

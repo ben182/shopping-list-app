@@ -66,6 +66,11 @@
                     @endforeach
                 </native:list-section>
             @endforeach
+
+            {{-- Luft am Listenende: sonst klebt die letzte Zeile beim
+                 Durchscrollen an der Tab-Leiste. Eine Zeilenhöhe, ohne eigene
+                 Farbe — der Hintergrund der Liste steht durch. --}}
+            <native:column ref="listenende" class="w-full h-14" />
         </native:list>
     @endif
 </native:column>

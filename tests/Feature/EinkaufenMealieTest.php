@@ -685,6 +685,31 @@ it('hängt den Block „Abgehakt“ unter die scrollende Liste statt hinein', fu
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 });
 
+/*
+ * Mit dem Block „Abgehakt“ unter der Liste ist unten schon eine Naht: dort
+ * genügt die schmale Luft von 24 dp, mit der die Liste seit jeher endet.
+ */
+it('bleibt mit dem Block „Abgehakt“ bei der schmalen Luft am Listenende', function () {
+    mitMealie([
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse'),
+        mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true),
+    ]);
+
+    $luft = listenLuft(Native::visit('/'));
+
+    expect($luft)->not->toBeNull();
+    expect($luft['layout']['height'] ?? null)->toBe(24.0);
+});
+
+it('lässt am Listenende eine Zeilenhöhe Luft, sobald der Block „Abgehakt“ fehlt', function () {
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    $screen = Native::visit('/');
+
+    expect(abgehaktZeilen($screen))->toBe([]);
+    expect(listenLuft($screen)['layout']['height'] ?? null)->toBe(56.0);
+});
+
 it('lässt den Abschnitt „Abgehakt“ weg, solange nichts abgehakt ist', function () {
     mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 

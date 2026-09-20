@@ -119,6 +119,8 @@ it('zeigt den Leerzustand, wenn alles auf der Liste ist', function () {
     $screen->assertSee('Alles auf der Liste.')
         ->assertMissingElement('list_item')
         ->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'check');
+
+    expect(knotenMitRef($screen, 'listenende'))->toBeNull();
 });
 
 it('ignoriert gespeicherte Artikel, die es im Katalog nicht mehr gibt', function () {
@@ -210,6 +212,8 @@ it('zeigt ohne Treffer einen Leerzustand mit der Eingabe in Anführungszeichen',
     $screen->assertSee('Keine Treffer für „Wassermelone“.')
         ->assertMissingElement('list_item')
         ->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'search_off');
+
+    expect(knotenMitRef($screen, 'listenende'))->toBeNull();
 });
 
 it('behält den Suchtext, wenn ein gefilterter Artikel auf die Liste wandert', function () {
@@ -243,4 +247,16 @@ it('bleibt mit Suchfeld und Löschen-Button bedienbar ohne Blick auf den Schirm'
         ->assertAccessible()
         ->input('vorrat-suche', 'sal')
         ->assertAccessible();
+});
+
+/*
+ * 56 dp ist die Höhe einer Listenzeile aus der PRD, nicht aus dem Code
+ * abgelesen — die letzte Zeile soll beim Durchscrollen frei über der
+ * Tab-Leiste stehen.
+ */
+it('lässt am Listenende eine Zeilenhöhe Luft', function () {
+    $luft = listenLuft(Native::visit('/vorrat'));
+
+    expect($luft)->not->toBeNull();
+    expect($luft['layout']['height'] ?? null)->toBe(56.0);
 });

@@ -27,6 +27,21 @@ it('schickt zu jeder Farbe eine davon verschiedene Dark-Mode-Entsprechung mit', 
     }
 })->with(['/', '/vorrat', '/wochenplan', '/einstellungen']);
 
+/*
+ * Die Luft am Listenende soll niemandem auffallen: kein Inhalt, keine Fläche,
+ * kein Rand. Ohne eigene Farbe zeichnet das Gerät den Hintergrund der Liste
+ * durch — hell wie dunkel, ohne zweite Farbe, die gepflegt werden müsste.
+ */
+it('lässt die Luft am Listenende farblos und leer', function (string $uri) {
+    app(EigeneListe::class)->hinzufuegen('tofu');
+
+    $luft = listenLuft(Native::visit($uri, platform: 'android'));
+
+    expect($luft)->not->toBeNull();
+    expect($luft['style'] ?? [])->toBe([]);
+    expect($luft['children'] ?? [])->toBe([]);
+})->with(['/', '/vorrat']);
+
 it('färbt auch die Leiste nach „Alles abhaken“ in beiden Erscheinungsbildern', function () {
     app(EigeneListe::class)->hinzufuegen('tofu');
 

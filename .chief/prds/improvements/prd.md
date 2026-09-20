@@ -82,15 +82,16 @@ Diese PRD bündelt diese Verbesserungen. Sie fügt keine neuen Mealie-Funktionen
 - [x] Der Fehlerfall des ursprünglichen Abhakens bleibt wie heute: Mealie-Artikel werden lokal zurückgerollt und der Toast „Mealie: Abhaken fehlgeschlagen" erscheint; die Leiste zeigt in diesem Fall nur die Anzahl der eigenen Artikel und ihr Rückgängig betrifft nur diese.
 
 ### FEIN-005: Luft am Listenende in allen Tabs
+**Status:** done
 **Priority:** 5
 **Description:** Als Nutzer möchte ich in Vorrat und Wochenplan bis zur letzten Zeile scrollen können, ohne dass sie an der Tab-Leiste klebt, so wie es im Einkaufen-Tab durch den Abgehakt-Block wirkt.
 
 **Acceptance Criteria:**
-- [ ] Im Vorrat endet die scrollbare Liste mit einem festen Abstand von einer Listenzeilenhöhe (56 dp), sodass die letzte Zeile beim vollständigen Scrollen ganz frei über der Tab-Leiste steht.
-- [ ] Im Wochenplan gilt dasselbe unterhalb des Sonntags-Blocks.
-- [ ] Im Einkaufen-Tab gilt dasselbe am Ende der Liste, wenn kein Abgehakt-Block angezeigt wird; ist der Block da, bleibt das heutige Verhalten.
-- [ ] Die Leerzustände (Vorrat ohne Treffer / alles auf der Liste, Einkaufen leer, Wochenplan ohne Cache) sehen unverändert aus.
-- [ ] Der Abstand ist in Hell und Dunkel unsichtbar (nimmt die Hintergrundfarbe an) und fällt nicht als Block auf.
+- [x] Im Vorrat endet die scrollbare Liste mit einem festen Abstand von einer Listenzeilenhöhe (56 dp), sodass die letzte Zeile beim vollständigen Scrollen ganz frei über der Tab-Leiste steht.
+- [x] Im Wochenplan gilt dasselbe unterhalb des Sonntags-Blocks.
+- [x] Im Einkaufen-Tab gilt dasselbe am Ende der Liste, wenn kein Abgehakt-Block angezeigt wird; ist der Block da, bleibt das heutige Verhalten.
+- [x] Die Leerzustände (Vorrat ohne Treffer / alles auf der Liste, Einkaufen leer, Wochenplan ohne Cache) sehen unverändert aus.
+- [x] Der Abstand ist in Hell und Dunkel unsichtbar (nimmt die Hintergrundfarbe an) und fällt nicht als Block auf.
 
 ### FEIN-006: Wochenplan-Cache aufräumen
 **Priority:** 6

@@ -117,6 +117,24 @@ it('kehrt zum Leerzustand zurück, sobald der letzte Artikel abgehakt ist', func
     expect(navUntertitel(Native::visit('/')))->toBeNull();
 });
 
+/*
+ * 56 dp ist die Höhe einer Listenzeile aus der PRD, nicht aus dem Code
+ * abgelesen. Ohne den Block „Abgehakt“ ist unter der Liste nur die
+ * Tab-Leiste — die letzte Zeile soll frei über ihr stehen.
+ */
+it('lässt ohne den Block „Abgehakt“ am Listenende eine Zeilenhöhe Luft', function () {
+    aufDieListe('tofu');
+
+    $luft = listenLuft(Native::visit('/'));
+
+    expect($luft)->not->toBeNull();
+    expect($luft['layout']['height'] ?? null)->toBe(56.0);
+});
+
+it('zeigt im Leerzustand keine Luft', function () {
+    expect(knotenMitRef(Native::visit('/'), 'listenende'))->toBeNull();
+});
+
 it('rendert die Artikel in einer scrollbaren Liste innerhalb der nativen Chrome', function () {
     aufDieListe('tofu');
 

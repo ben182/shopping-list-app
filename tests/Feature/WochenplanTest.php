@@ -126,9 +126,17 @@ function wochenplanInhalt(TestableComponent $screen): array
     $walk = function (array $node) use (&$walk, &$inhalt): void {
         if (($node['type'] ?? null) === 'list') {
             foreach ($node['children'] ?? [] as $kind) {
+                $text = $kind['props']['text'] ?? $kind['props']['headline'] ?? null;
+
+                // Der Abstandhalter am Listenende trägt keinen Text und ist
+                // kein Inhalt — er gehört nicht in diese Aufzählung.
+                if ($text === null) {
+                    continue;
+                }
+
                 $inhalt[] = [
                     'typ' => $kind['type'] ?? '',
-                    'text' => $kind['props']['text'] ?? $kind['props']['headline'] ?? null,
+                    'text' => $text,
                     'farbe' => $kind['props']['color'] ?? $kind['props']['headline_color'] ?? null,
                     'knoten' => $kind,
                 ];
@@ -241,6 +249,26 @@ it('zeigt „Nichts geplant“ unter einem Tag ohne Einträge', function () {
         ->and($inhalt[3]['farbe'])->not->toBeNull();
 });
 
+/*
+ * 56 dp ist die Höhe einer Listenzeile aus der PRD, nicht aus dem Code
+ * abgelesen — der Sonntag soll beim Durchscrollen frei über der Tab-Leiste
+ * stehen.
+ */
+it('lässt unter dem Sonntag eine Zeilenhöhe Luft', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+    mitWochenplan([mealplanEintrag('2026-09-27', 'dinner', 'Lasagne')]);
+
+    $screen = Native::visit('/wochenplan');
+    $luft = listenLuft($screen);
+
+    expect(wochenplanInhalt($screen)[13]['text'] ?? null)->toBe('Lasagne')
+        ->and($luft)->not->toBeNull()
+        ->and($luft['layout']['height'] ?? null)->toBe(56.0)
+        // Ohne eigene Fläche und ohne Inhalt: der Hintergrund steht durch.
+        ->and($luft['style'] ?? [])->toBe([])
+        ->and($luft['children'] ?? [])->toBe([]);
+});
+
 it('zeichnet einen Rezept-Eintrag mit deutschem Mahlzeitentyp, Rezeptname und Rezeptbild', function () {
     CarbonImmutable::setTestNow('2026-09-23 10:00:00');
     mitWochenplan([mealplanEintrag('2026-09-23', 'lunch', 'Kürbissuppe')]);
@@ -336,7 +364,8 @@ it('zeigt ohne Token einen Leerzustand mit dem Weg zu den Einstellungen', functi
     $screen = Native::visit('/wochenplan', platform: 'android');
 
     expect(tagesUeberschriften($screen))->toBe([])
-        ->and(knotenMitRef($screen, 'wochenplan-einstellungen')['props']['label'] ?? null)->toBe('Zu den Einstellungen');
+        ->and(knotenMitRef($screen, 'wochenplan-einstellungen')['props']['label'] ?? null)->toBe('Zu den Einstellungen')
+        ->and(knotenMitRef($screen, 'listenende'))->toBeNull();
 
     $screen->assertElement('text', fn (array $node) => ($node['props']['text'] ?? null) === 'Mealie nicht verbunden')
         ->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'calendar_month');
@@ -651,7 +680,8 @@ it('zeigt für eine Woche ohne Cache das Banner und darunter einen Leerzustand',
         ->assertSee('Wochenplan konnte nicht geladen werden');
 
     expect(tagesUeberschriften($screen))->toBe([])
-        ->and(knotenMitRef($screen, 'wochenplan-fehler-icon')['props']['name'] ?? null)->toBe('warning');
+        ->and(knotenMitRef($screen, 'wochenplan-fehler-icon')['props']['name'] ?? null)->toBe('warning')
+        ->and(knotenMitRef($screen, 'listenende'))->toBeNull();
 
     $refs = refReihenfolge($screen);
 
