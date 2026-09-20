@@ -41,19 +41,20 @@ Prefix: `EKL`.
 - [x] Es gibt keine Livewire-, Inertia- oder WebView-Screens; alle Screens sind `NativeComponent`-Klassen mit Edge-Blade-Views.
 
 ### EKL-002: Vorrat anzeigen und Artikel auf die Liste setzen
+**Status:** done
 **Priority:** 2
 **Blocked by:** EKL-001
 **Description:** Als Nutzer möchte ich im Vorrat alle Katalog-Artikel sehen, die noch nicht auf meiner Liste stehen, und sie per Tap auf die Liste setzen, damit ich meinen Einkauf zusammenstellen kann.
 
 **Acceptance Criteria:**
-- [ ] Der Katalog enthält exakt die 8 Gruppen und 113 Artikel aus Anhang A in genau dieser Reihenfolge; er ist als Konfiguration im Code hinterlegt und in der App nicht editierbar.
-- [ ] Der Vorrat-Screen zeigt alle Katalog-Artikel, die **nicht** auf der Liste sind, gruppiert nach Warengruppe. Jede Gruppe hat eine Zwischenüberschrift mit dem Gruppennamen (Kleinbuchstaben-Kapitälchen-Stil: kleine Schrift, Großbuchstaben, gedämpfte Farbe). Gruppen ohne sichtbare Artikel werden samt Überschrift ausgeblendet.
-- [ ] Die Reihenfolge der Gruppen und der Artikel innerhalb einer Gruppe entspricht immer der Katalogreihenfolge, nie alphabetisch oder nach Zeitpunkt.
-- [ ] Jeder Artikel ist eine `native:list-item`-Zeile mit dem Artikelnamen als Headline und einem Plus-Icon als Trailing-Icon; die ganze Zeile ist tappbar.
-- [ ] Tap auf einen Artikel entfernt ihn sofort aus dem Vorrat (ohne Bestätigung, ohne sichtbare Verzögerung); der Zustand ist nach Beenden und Neustart der App erhalten.
-- [ ] Der Untertitel in der Top-Bar lautet „Tippe auf einen Artikel zum Hinzufügen“, wenn die Liste leer ist, sonst „n auf der Liste“ (n = Anzahl eigener Artikel auf der Liste, z. B. „5 auf der Liste“).
-- [ ] Sind alle Katalog-Artikel auf der Liste, zeigt der Screen einen zentrierten Leerzustand mit einem Häkchen-Icon (`native:icon`, kein Emoji) und dem Text „Alles auf der Liste.“
-- [ ] Der Listen-Zustand liegt in einer lokalen SQLite-Tabelle; Migrationen laufen beim App-Start. Ein App-Update mit geändertem Katalog löscht den gespeicherten Zustand nicht; gespeicherte Artikel-IDs, die im Katalog nicht mehr existieren, werden nirgends angezeigt und zählen in keiner Anzahl mit.
+- [x] Der Katalog enthält exakt die 8 Gruppen und 113 Artikel aus Anhang A in genau dieser Reihenfolge; er ist als Konfiguration im Code hinterlegt und in der App nicht editierbar.
+- [x] Der Vorrat-Screen zeigt alle Katalog-Artikel, die **nicht** auf der Liste sind, gruppiert nach Warengruppe. Jede Gruppe hat eine Zwischenüberschrift mit dem Gruppennamen (Kleinbuchstaben-Kapitälchen-Stil: kleine Schrift, Großbuchstaben, gedämpfte Farbe). Gruppen ohne sichtbare Artikel werden samt Überschrift ausgeblendet.
+- [x] Die Reihenfolge der Gruppen und der Artikel innerhalb einer Gruppe entspricht immer der Katalogreihenfolge, nie alphabetisch oder nach Zeitpunkt.
+- [x] Jeder Artikel ist eine `native:list-item`-Zeile mit dem Artikelnamen als Headline und einem Plus-Icon als Trailing-Icon; die ganze Zeile ist tappbar.
+- [x] Tap auf einen Artikel entfernt ihn sofort aus dem Vorrat (ohne Bestätigung, ohne sichtbare Verzögerung); der Zustand ist nach Beenden und Neustart der App erhalten.
+- [x] Der Untertitel in der Top-Bar lautet „Tippe auf einen Artikel zum Hinzufügen“, wenn die Liste leer ist, sonst „n auf der Liste“ (n = Anzahl eigener Artikel auf der Liste, z. B. „5 auf der Liste“).
+- [x] Sind alle Katalog-Artikel auf der Liste, zeigt der Screen einen zentrierten Leerzustand mit einem Häkchen-Icon (`native:icon`, kein Emoji) und dem Text „Alles auf der Liste.“
+- [x] Der Listen-Zustand liegt in einer lokalen SQLite-Tabelle; Migrationen laufen beim App-Start. Ein App-Update mit geändertem Katalog löscht den gespeicherten Zustand nicht; gespeicherte Artikel-IDs, die im Katalog nicht mehr existieren, werden nirgends angezeigt und zählen in keiner Anzahl mit.
 
 ### EKL-003: Eigene Artikel auf dem Einkaufen-Screen abhaken
 **Priority:** 3

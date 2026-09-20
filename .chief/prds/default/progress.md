@@ -40,7 +40,22 @@
   deshalb `env('NATIVEPHP_APP_ID') ?: 'de.ben182.einkaufsliste'`.
 - **Qualitäts-Gate:** `./vendor/bin/pint`, `php artisan test`,
   `php artisan native:validate`. Build-Kommandos (`native:run`, `native:package`)
-  werden nur ausgegeben, nicht ausgeführt.
+  werden nur ausgegeben, nicht ausgeführt. **`native:validate` ist seit EKL-002
+  dauerhaft rot**: sein Analyzer kennt nur die Core-Elemente und meldet jedes
+  mobile-ui-Tag (`list`, `list-item`, `list-section`, …) als „Unknown native
+  element type". Nur prüfen, dass keine *anderen* Fehler dazukommen.
+- **Katalog** in `config/katalog.php` (8 Gruppen, 112 Artikel — nicht 113, wie
+  die PRD an mehreren Stellen schreibt). Zugriff nur über `App\Katalog\Katalog`
+  (`gruppen()`, `artikelIds()`, `kennt()`, `gruppiert()`), der Listen-Zustand nur
+  über `App\Liste\EigeneListe`. Gespeichert wird ausschließlich die Artikel-ID;
+  IDs ohne Katalog-Eintrag werden beim Lesen gefiltert.
+- **Callback mit String-Argument** nie direkt ins Attribut schreiben
+  (`@press="tu('{{ $id }}')"` bricht den Validator). Stattdessen
+  `@php($press = "tu('{$id}')")` und `@press="{{ $press }}"`.
+- **Migrationen laufen auf dem Gerät automatisch** beim Entpacken des Payloads;
+  kein `Artisan::call('migrate')`, kein `db:seed` — Startdaten in eine
+  Migration. Nach einer neuen Migration braucht es `native:run`, PHP-Hot-Reload
+  reicht nicht.
 
 ---
 
@@ -107,3 +122,89 @@ emulator -avd Pixel_7_API_35      # oder Gerät per USB
 php artisan native:run android
 ```
 <!-- chief-timing story="EKL-001" duration_ms=1130003 cost=43.882863 in=376 out=1265 cache_create=540946 cache_read=22426407 -->
+
+## 2026-09-20 - EKL-002
+
+Katalog als Konfiguration, Vorrat-Screen mit Gruppen und Tap-to-Add, eigener
+Listen-Zustand in SQLite.
+
+**Geänderte / neue Dateien**
+
+- `config/katalog.php` — 8 Gruppen, 112 Artikel, 1:1 aus
+  `~/Code/shopping-list/shared/items.ts`, verschachtelt als
+  `gruppen.<id>.artikel.<id> => Name`; die Array-Reihenfolge *ist* die
+  Anzeigereihenfolge
+- `app/Katalog/{Katalog,Gruppe,Artikel}.php` — liest die Konfiguration,
+  `gruppen()`, `artikelIds()`, `kennt()`, `gruppiert(array $ids)`
+- `app/Liste/EigeneListe.php` — `artikelIds()`, `vorratIds()`, `anzahl()`,
+  `hinzufuegen()`, `entfernen()`; filtert unbekannte IDs beim **Lesen**
+- `app/Models/ListenArtikel.php` + Migration `create_listen_artikel_table`
+  (String-Primärschlüssel `artikel_id`, sonst nur Timestamps)
+- `app/NativeComponents/Vorrat.php`, `resources/views/native/vorrat.blade.php`
+- `tests/Pest.php` — Helfer `listenAbschnitte()`, `navUntertitel()`
+- `tests/Feature/VorratTest.php` — 10 Tests
+
+31 Tests, 190 Assertions, grün. Pint sauber.
+
+**Learnings für die nächsten Iterationen**
+
+- **Anhang A hat 112 Artikel, nicht 113.** Der Story-Text und FR-1 nennen 113;
+  nachgezählt in der Quelle (`shared/items.ts`) und in Anhang A selbst sind es
+  112 (17/5/26/7/35/7/8/7). Der Katalog ist bewusst 1:1 die Quelle. Wenn in
+  einer späteren Story wieder „113" steht: es bleiben 112.
+- **`php artisan native:validate` meldet die mobile-ui-Elemente als Fehler**
+  (`Unknown native element type: 'list' / 'list-section' / 'list-item'`).
+  `Native\Mobile\Validation\BladeTemplateAnalyzer::KNOWN_ELEMENTS` ist eine
+  hartkodierte Konstante mit nur den Core-Elementen, und `ValidateCommand`
+  baut den Analyzer mit `new` — kein Container, kein Hook, keine Option. Das
+  ist ein Paket-Gap in mobile 4.5.1, kein Fehler im Code; die Elemente
+  rendern nachweislich (Wire-Tree-Tests). **Ab hier ist `native:validate`
+  dauerhaft rot**, sobald ein Screen mobile-ui benutzt — vor dem Commit
+  prüfen, dass *nur* „Unknown native element type" für mobile-ui-Tags
+  übrig bleibt.
+- **Ein Callback-Argument in Anführungszeichen direkt im Attribut** —
+  `@press="aufDieListe('{{ $id }}')"` — lässt denselben Analyzer
+  `'aufDieListe('` als Methodennamen extrahieren (seine Regex bricht am
+  ersten `'` ab) und einen zweiten Fehler melden. Deshalb den Aufruf vorher
+  in eine Variable legen: `@php($press = "aufDieListe('{$id}')")` und dann
+  `@press="{{ $press }}"`. Numerische Argumente (`@press="open({{ $id }})"`)
+  sind unproblematisch.
+- **Migrationen laufen von selbst.** Der native Host ruft
+  `artisan migrate --force` selbst auf, sobald das PHP-Payload frisch
+  entpackt wurde (Android: `LaravelEnvironment.kt` `runBaseArtisanCommands()`,
+  iOS: `AppUpdateManager.swift` `runMigrationsAndClearCaches()`). Kein
+  `Artisan::call('migrate')` im App-Code. Konsequenz: **reines PHP-Hot-Reload
+  führt keine neue Migration aus** — dafür braucht es `native:run`.
+  Ebenso gibt es auf dem Gerät **kein `db:seed`**; Startdaten gehören in die
+  `up()` einer Migration.
+- Die Geräte-Datenbank liegt außerhalb des austauschbaren Payloads
+  (Android `…/persisted_data/database/database.sqlite`, iOS
+  `Application Support/database/database.sqlite`) und überlebt App-Updates.
+  `database/database.sqlite` aus dem Repo wird beim Build ausgeschlossen.
+- **`native:list-section` rendert nichts ohne Zeilen** und die Android-Seite
+  setzt den Header selbst auf `uppercase`, `onSurfaceVariant`, 13sp, SemiBold
+  (`vendor/nativephp/mobile-ui/resources/android/ListRenderer.kt`,
+  `SectionHeader`). Der geforderte Kapitälchen-Stil kommt also aus dem
+  Renderer — den Gruppennamen normal schreiben, nicht selbst großschreiben.
+- **`trailingIcon` ist ein reiner String**, keine Enum. Enums gehören in
+  `:trailingIconIos` / `:trailingIconAndroid` (gleiches Muster für
+  `leadingIcon*`).
+- **`on_press` steht auf Knotenebene, nicht in `props`** —
+  `assertElement('list_item', fn ($n) => isset($n['on_press']))`.
+- **`tap('Sichtbarer Text')` im Harness** findet das nächste pressable
+  Element, dessen Teilbaum den Text zeigt — deutlich lesbarer als
+  `press('methode(\'id\')')`, das die exakte Ausdrucks-Zeichenkette braucht
+  (`press('methode')` allein trifft in einer Liste die *erste* Registrierung).
+- **`#[Computed]`-Methoden heißen wie Properties** (`gruppen()` → `$this->gruppen`)
+  und werden nach jedem UI-Event automatisch verworfen; `unset($this->gruppen)`
+  im Handler ist trotzdem sinnvoll, wenn der Handler direkt gerufen wird.
+- Der Untertitel kommt im Wire-Tree als `nav_subtitle` an und wird von
+  `assertSee()` mit durchsucht — für genaue Prüfungen aber besser den Helfer
+  `navUntertitel()` benutzen.
+- **Zustand statt Zeitpunkt speichern:** `listen_artikel` hält nur die ID.
+  Damit kostet eine Katalog-Änderung nichts, und die „unbekannte ID"-Regel
+  aus FR-5 ist eine einzige Filterstelle (`EigeneListe::artikelIds()`).
+  EKL-003 sollte für den Einkaufen-Screen dieselben zwei Klassen benutzen
+  (`Katalog::gruppiert()` + `EigeneListe`), nicht eigene Abfragen bauen.
+---
+<!-- chief-timing story="EKL-002" duration_ms=566229 cost=43.549752 in=452 out=1310 cache_create=854140 cache_read=18286398 -->

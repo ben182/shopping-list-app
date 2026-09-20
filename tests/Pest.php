@@ -69,3 +69,55 @@ function farbPaare(array $tree): array
 
     return $paare;
 }
+
+/**
+ * Die Abschnitte der gerenderten Liste in Render-Reihenfolge: pro Abschnitt
+ * seine Überschrift und die Headlines seiner Zeilen. Das ist genau das, was
+ * das Gerät zeichnen würde — Reihenfolge inklusive.
+ *
+ * @return list<array{ueberschrift: ?string, artikel: list<string>}>
+ */
+function listenAbschnitte(TestableComponent $screen): array
+{
+    $abschnitte = [];
+
+    $walk = function (array $node) use (&$walk, &$abschnitte): void {
+        if (($node['type'] ?? null) === 'list_section') {
+            $abschnitte[] = [
+                'ueberschrift' => $node['props']['header'] ?? null,
+                'artikel' => array_values(array_map(
+                    fn (array $zeile) => $zeile['props']['headline'] ?? '',
+                    array_filter($node['children'] ?? [], fn (array $zeile) => ($zeile['type'] ?? null) === 'list_item'),
+                )),
+            ];
+
+            return;
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return $abschnitte;
+}
+
+/** Der Untertitel, den die Top-Bar ans Gerät schickt. */
+function navUntertitel(TestableComponent $screen): ?string
+{
+    $untertitel = null;
+
+    $walk = function (array $node) use (&$walk, &$untertitel): void {
+        $untertitel ??= $node['props']['nav_subtitle'] ?? null;
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return $untertitel;
+}
