@@ -2,6 +2,8 @@
 
 namespace App\NativeComponents;
 
+use App\Erscheinungsbild\Auswahl;
+use App\Erscheinungsbild\Modus;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
 use App\Mealie\Verbindung;
@@ -28,6 +30,13 @@ class Einstellungen extends NativeComponent
     /** Das Ergebnis des letzten Verbindungstests, solange der Screen offen ist. */
     public ?string $verbindung = null;
 
+    /**
+     * Die ausgewählte Option des Segmented Controls, als Position. Der
+     * Control kennt nur Indizes; welcher Modus dahintersteht, sagt
+     * {@see Modus::anPosition()}.
+     */
+    public int $erscheinungsbild = 0;
+
     public function navTitle(): string
     {
         return 'Einstellungen';
@@ -35,7 +44,30 @@ class Einstellungen extends NativeComponent
 
     public function mount(): void
     {
+        $this->erscheinungsbild = app(Auswahl::class)->aktuell()->position();
+
         $this->statusLesen();
+    }
+
+    /**
+     * Ein Tipp auf eine Option gilt sofort — es gibt für diesen Abschnitt
+     * keinen Speichern-Knopf, und eine Farbvorliebe braucht keinen.
+     */
+    public function erscheinungsbildGewaehlt(int $position): void
+    {
+        $modus = Modus::anPosition($position);
+
+        $this->erscheinungsbild = $modus->position();
+
+        app(Auswahl::class)->waehlen($modus);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function erscheinungsbildOptionen(): array
+    {
+        return Modus::beschriftungen();
     }
 
     public function mealieUrl(): string

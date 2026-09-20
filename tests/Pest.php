@@ -246,3 +246,33 @@ function jsonFixture(string $dateiname): array
         flags: JSON_THROW_ON_ERROR,
     );
 }
+
+/**
+ * Die Texte des Baums in Render-Reihenfolge — Überschriften, Absätze und
+ * Knopfbeschriftungen. `assertSee()` sagt nur, *dass* etwas dasteht; für
+ * „oberhalb von“ braucht es die Reihenfolge.
+ *
+ * @return list<string>
+ */
+function sichtbarerText(TestableComponent $screen): array
+{
+    $texte = [];
+
+    $walk = function (array $node) use (&$walk, &$texte): void {
+        foreach (['content', 'text', 'label', 'header', 'headline'] as $schluessel) {
+            $wert = $node['props'][$schluessel] ?? null;
+
+            if (is_string($wert) && $wert !== '') {
+                $texte[] = $wert;
+            }
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return $texte;
+}

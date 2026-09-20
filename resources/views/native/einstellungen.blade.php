@@ -1,4 +1,18 @@
 <native:column class="w-full h-full bg-theme-background gap-3 px-4 pt-4">
+    <native:text class="text-sm text-theme-on-surface-variant">Erscheinungsbild</native:text>
+
+    {{-- Kein Speichern-Knopf: der Tipp auf eine Option ist die Eingabe. Das
+         `a11y-label` benennt die Gruppe; ob eine Option gewählt ist, meldet
+         der Segmented Control dem Screenreader selbst. --}}
+    <native:button-group
+        ref="erscheinungsbild"
+        class="w-full"
+        a11y-label="Erscheinungsbild"
+        :options="$this->erscheinungsbildOptionen()"
+        :value="$this->erscheinungsbild"
+        @change="erscheinungsbildGewaehlt"
+    />
+
     <native:text class="text-sm text-theme-on-surface-variant">Mealie-Server</native:text>
     <native:text class="text-base text-theme-on-surface">{{ $this->mealieUrl() }}</native:text>
 
