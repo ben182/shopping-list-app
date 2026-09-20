@@ -57,17 +57,18 @@ Prefix: `EKL`.
 - [x] Der Listen-Zustand liegt in einer lokalen SQLite-Tabelle; Migrationen laufen beim App-Start. Ein App-Update mit geändertem Katalog löscht den gespeicherten Zustand nicht; gespeicherte Artikel-IDs, die im Katalog nicht mehr existieren, werden nirgends angezeigt und zählen in keiner Anzahl mit.
 
 ### EKL-003: Eigene Artikel auf dem Einkaufen-Screen abhaken
+**Status:** done
 **Priority:** 3
 **Blocked by:** EKL-002
 **Description:** Als Nutzer möchte ich auf dem Einkaufen-Screen meine Artikel gruppiert sehen und per Tap zurück in den Vorrat schicken, damit ich beim Einkaufen abhaken kann.
 
 **Acceptance Criteria:**
-- [ ] Der Einkaufen-Screen zeigt alle eigenen Artikel, die auf der Liste sind, gruppiert nach Warengruppe mit denselben Zwischenüberschriften und derselben Reihenfolge wie im Vorrat (Katalogreihenfolge); leere Gruppen sind ausgeblendet.
-- [ ] Jeder Artikel ist eine `native:list-item`-Zeile mit einer leeren Checkbox vorn (Leading-Checkbox, nicht angehakt) und dem Artikelnamen als Headline. Tap auf die ganze Zeile entfernt den Artikel sofort von der Liste; er erscheint danach wieder im Vorrat.
-- [ ] Ein im Vorrat hinzugefügter Artikel erscheint ohne Neuladen beim Wechsel auf den Einkaufen-Tab an seiner Katalogposition.
-- [ ] Der Untertitel in der Top-Bar zeigt „n Artikel“ (Anzahl aller offenen Artikel auf dem Screen; solange keine Mealie-Anbindung existiert, nur eigene Artikel). Bei 0 Artikeln wird kein Untertitel angezeigt.
-- [ ] Ist die Liste leer, zeigt der Screen einen zentrierten Leerzustand mit Einkaufswagen-Icon (`native:icon`), dem Text „Liste ist leer.“ und darunter kleiner, gedämpft: „Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.“
-- [ ] Die Liste ist scrollbar und Inhalte liegen nicht hinter der Tab-Leiste.
+- [x] Der Einkaufen-Screen zeigt alle eigenen Artikel, die auf der Liste sind, gruppiert nach Warengruppe mit denselben Zwischenüberschriften und derselben Reihenfolge wie im Vorrat (Katalogreihenfolge); leere Gruppen sind ausgeblendet.
+- [x] Jeder Artikel ist eine `native:list-item`-Zeile mit einer leeren Checkbox vorn (Leading-Checkbox, nicht angehakt) und dem Artikelnamen als Headline. Tap auf die ganze Zeile entfernt den Artikel sofort von der Liste; er erscheint danach wieder im Vorrat.
+- [x] Ein im Vorrat hinzugefügter Artikel erscheint ohne Neuladen beim Wechsel auf den Einkaufen-Tab an seiner Katalogposition.
+- [x] Der Untertitel in der Top-Bar zeigt „n Artikel“ (Anzahl aller offenen Artikel auf dem Screen; solange keine Mealie-Anbindung existiert, nur eigene Artikel). Bei 0 Artikeln wird kein Untertitel angezeigt.
+- [x] Ist die Liste leer, zeigt der Screen einen zentrierten Leerzustand mit Einkaufswagen-Icon (`native:icon`), dem Text „Liste ist leer.“ und darunter kleiner, gedämpft: „Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.“
+- [x] Die Liste ist scrollbar und Inhalte liegen nicht hinter der Tab-Leiste.
 
 ### EKL-004: Vorrat durchsuchen
 **Priority:** 4

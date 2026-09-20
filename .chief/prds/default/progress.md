@@ -208,3 +208,60 @@ Listen-Zustand in SQLite.
   (`Katalog::gruppiert()` + `EigeneListe`), nicht eigene Abfragen bauen.
 ---
 <!-- chief-timing story="EKL-002" duration_ms=566229 cost=43.549752 in=452 out=1310 cache_create=854140 cache_read=18286398 -->
+
+## 2026-09-20 - EKL-003
+
+Der Einkaufen-Screen zeigt jetzt die eigenen Listen-Artikel gruppiert in
+Katalogreihenfolge, jede Zeile mit leerer Leading-Checkbox; Tap auf die Zeile
+schickt den Artikel zurück in den Vorrat. Untertitel „n Artikel" (bei 0 kein
+Untertitel), Leerzustand mit Einkaufswagen-Icon bleibt erhalten.
+
+Der Screen ist das Spiegelbild des Vorrats: dieselben zwei Fachklassen
+(`Katalog::gruppiert()` + `EigeneListe`), nur `artikelIds()` statt
+`vorratIds()` und `entfernen()` statt `hinzufuegen()`. Kein neuer Zustand,
+keine eigene Abfrage.
+
+**Dateien**
+
+- `app/NativeComponents/Einkaufen.php` — `navSubtitle()`, `#[Computed] gruppen()`,
+  `abhaken()`; Zahnrad-Action aus EKL-001 unverändert
+- `resources/views/native/einkaufen.blade.php` — Liste + bestehender Leerzustand
+- `tests/Feature/EinkaufenTest.php` — 10 Tests
+
+41 Tests, 260 Assertions, grün. Pint sauber. `native:validate` unverändert rot
+mit genau den 6 bekannten „Unknown native element type"-Meldungen (3 pro
+Listen-Blade), keine neuen.
+
+**Learnings für die nächsten Iterationen**
+
+- **Ein Tab-Wechsel ist `replace`, keine `navigate`.** `tap('Einkaufen')` auf der
+  Tab-Leiste funktioniert im Harness, aber danach braucht es
+  `->assertReplacedWith('/')->follow()`. Ohne `follow()` bleibt der alte Screen
+  im Baum stehen und der Test prüft stumm das Falsche —
+  `assertNavigatedTo()` schlägt hier mit „got [replace]" fehl. Damit lässt sich
+  „ohne Neuladen beim Tab-Wechsel" echt testen statt über einen frischen
+  `Native::visit()`.
+- **Boolesche `list-item`-Attribute gebunden übergeben:** `:leadingCheckbox="false"`.
+  Als `leadingCheckbox="false"` käme die *Zeichenkette* „false" an, und
+  `ListItem::applyAttributes()` castet mit `(bool)` — die Checkbox wäre angehakt.
+  Die Prüfung `isset($attrs['leadingCheckbox'])` ist auf `false` trotzdem wahr,
+  die Checkbox erscheint also.
+- **`leadingCheckbox` setzt zwei Props:** `leading_type = 'checkbox'` und
+  `leading_checked`. Beide zusammen prüfen — `leading_checked === false` allein
+  wäre auch ohne Checkbox erfüllt (fehlendes Prop ≠ false, aber der `?? null`
+  in der Matcher-Kette verschleiert das leicht).
+- **Kein Untertitel = `navSubtitle(): null`.** `NavBar::subtitle(null)` lässt das
+  `nav_subtitle`-Prop weg, `navUntertitel()` liefert dann `null`. Ein leerer
+  String wäre etwas anderes.
+- Der Leerzustand des Einkaufen-Screens stand seit EKL-001 schon im Blade und
+  erfüllte das Akzeptanzkriterium wörtlich — vor dem Nachbauen prüfen, was der
+  Grundgerüst-Commit schon hingelegt hat.
+- Für EKL-005 („Alles abhaken"): `EigeneListe` hat noch keine Bulk-Operation.
+  Die Anzahl für den Dialogtext kommt aus `anzahl()`, das Entfernen müsste eine
+  neue Methode (`alleEntfernen()`) werden, damit es ein Query bleibt.
+- Für EKL-007 (Mealie): `navSubtitle()` und der Leerzustand hängen beide allein
+  an `EigeneListe::anzahl()`. Sobald Mealie-Artikel dazukommen, müssen beide
+  Stellen auf eine gemeinsame „offene Artikel"-Zahl umgestellt werden — sonst
+  verschwindet der Untertitel, obwohl Mealie-Zeilen sichtbar sind.
+---
+<!-- chief-timing story="EKL-003" duration_ms=222992 cost=10.644197 in=114 out=413 cache_create=239785 cache_read=4077029 -->
