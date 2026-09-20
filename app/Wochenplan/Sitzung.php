@@ -3,6 +3,7 @@
 namespace App\Wochenplan;
 
 use App\Mealie\Fehler;
+use App\Mealie\Fehlerzustand;
 
 /**
  * Was diese App-Sitzung vom Wochenplan schon weiß: je Woche die geladenen
@@ -10,18 +11,28 @@ use App\Mealie\Fehler;
  *
  * Der Zustand gehört der Sitzung, nicht dem Screen — jeder Tab-Wechsel
  * mountet den Wochenplan neu, und eine schon geladene Woche soll dann nicht
- * wieder hinter einem Spinner verschwinden.
+ * wieder hinter einem Spinner verschwinden. Den App-Neustart überlebt sie
+ * ebenfalls: dahinter liegt `Cache` in SQLite, aus dem sich jede Woche beim
+ * ersten Zugriff füllt.
  */
 final class Sitzung
 {
-    /** @var array<string, list<Eintrag>> */
+    /**
+     * Je Woche ihre Einträge — `null` für „diese Woche kennt die App nicht“.
+     * Ein fehlender Schlüssel heißt dagegen nur „noch nicht im Cache
+     * nachgesehen“.
+     *
+     * @var array<string, ?list<Eintrag>>
+     */
     private array $wochen = [];
 
     private ?Fehler $fehler = null;
 
+    public function __construct(private readonly Cache $cache) {}
+
     public function hat(string $schluessel): bool
     {
-        return array_key_exists($schluessel, $this->wochen);
+        return $this->geladen($schluessel) !== null;
     }
 
     /**
@@ -29,7 +40,7 @@ final class Sitzung
      */
     public function eintraege(string $schluessel): array
     {
-        return $this->wochen[$schluessel] ?? [];
+        return $this->geladen($schluessel) ?? [];
     }
 
     /**
@@ -40,12 +51,13 @@ final class Sitzung
      */
     public function setzen(string $schluessel, array $eintraege): void
     {
-        $this->wochen[$schluessel] = array_map(
-            fn (array $daten) => Eintrag::ausDaten($daten),
-            array_values($eintraege),
-        );
+        $eintraege = array_values($eintraege);
+
+        $this->wochen[$schluessel] = array_map(Eintrag::ausDaten(...), $eintraege);
 
         $this->fehler = null;
+
+        $this->cache->speichern($schluessel, $eintraege);
     }
 
     public function fehlerMelden(Fehler $fehler): void
@@ -58,10 +70,36 @@ final class Sitzung
         return $this->fehler;
     }
 
+    /**
+     * Was das Banner über dieser Woche sagt — `null`, solange es keines gibt.
+     * Der Stand gehört der Woche, die gerade aufgeschlagen ist: eine andere,
+     * jüngere Woche im Cache sagt über diese hier nichts.
+     */
+    public function fehlerzustand(string $schluessel): ?Fehlerzustand
+    {
+        return $this->fehler === null ? null : new Fehlerzustand($this->fehler, $this->cache->stand($schluessel));
+    }
+
     /** Kein Token mehr — was aus Mealie kam, hat hier nichts mehr verloren. */
     public function vergessen(): void
     {
         $this->wochen = [];
         $this->fehler = null;
+
+        $this->cache->leeren();
+    }
+
+    /**
+     * @return ?list<Eintrag>
+     */
+    private function geladen(string $schluessel): ?array
+    {
+        if (! array_key_exists($schluessel, $this->wochen)) {
+            $daten = $this->cache->eintraege($schluessel);
+
+            $this->wochen[$schluessel] = $daten === null ? null : array_map(Eintrag::ausDaten(...), $daten);
+        }
+
+        return $this->wochen[$schluessel];
     }
 }

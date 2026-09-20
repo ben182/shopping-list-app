@@ -1,7 +1,10 @@
 <?php
 
+use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Ben182\AppLifecycle\Events\AppForegrounded;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\AsyncTask;
 use Native\Mobile\Testing\Native;
@@ -361,4 +364,300 @@ it('lädt die Woche beim Zurückkehren der App in den Vordergrund und per Pull-t
     $screen->press('neuLaden');
 
     Http::assertSentCount(3);
+});
+
+/*
+ * Ab hier: Wochenplan-Cache und Fehlerzustand (EKL-012).
+ */
+
+/** Alles, was die App vom Wochenplan im Arbeitsspeicher hält, vergessen — der App-Neustart. */
+function wochenplanNeuStarten(): void
+{
+    app()->forgetInstance(Wochenplansitzung::class);
+}
+
+/**
+ * Mealie antwortet je Woche mit den Einträgen unter ihrem Montag — bis der
+ * zurückgegebene Schalter auf Ausfall gestellt wird: `$ausfall()` für den
+ * Ausfall, `$ausfall(false)` zurück.
+ *
+ * @param  array<string, list<array<string, mixed>>>  $wochen  Montag (`Y-m-d`) => Einträge
+ * @param  ?int  $status  HTTP-Status des Ausfalls; ohne Status ein Netzfehler
+ */
+function wochenplanAntwortetDannNicht(array $wochen, ?int $status = null): Closure
+{
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    $ausfall = false;
+
+    Http::fake(function (Request $anfrage) use ($wochen, $status, &$ausfall) {
+        if ($ausfall) {
+            if ($status === null) {
+                throw new ConnectionException('Zeitüberschreitung');
+            }
+
+            return Http::response([], $status);
+        }
+
+        parse_str((string) parse_url($anfrage->url(), PHP_URL_QUERY), $abfrage);
+
+        return Http::response(['items' => $wochen[$abfrage['start_date'] ?? ''] ?? []]);
+    });
+
+    return function (bool $aus = true) use (&$ausfall): void {
+        $ausfall = $aus;
+    };
+}
+
+it('zeigt nach einem App-Neustart die gecachte Woche, obwohl Mealie nicht mehr antwortet', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ]);
+
+    Native::visit('/wochenplan');
+
+    wochenplanNeuStarten();
+    $ausfall();
+
+    expect(wochenplanZeile(Native::visit('/wochenplan'), 'Lasagne'))->not->toBeNull();
+});
+
+it('hält je Woche einen eigenen Stand und zeigt ihn beim Wochenwechsel sofort', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+        '2026-09-28' => [mealplanEintrag('2026-09-30', 'dinner', 'Chili sin Carne')],
+    ]);
+
+    Native::visit('/wochenplan')->press('naechsteWoche');
+
+    wochenplanNeuStarten();
+    $ausfall();
+
+    $screen = Native::visit('/wochenplan');
+
+    expect(wochenplanZeile($screen, 'Lasagne'))->not->toBeNull()
+        ->and(wochenplanZeile($screen, 'Chili sin Carne'))->toBeNull();
+
+    $screen->press('naechsteWoche');
+
+    expect(wochenplanZeile($screen, 'Chili sin Carne'))->not->toBeNull()
+        ->and(wochenplanZeile($screen, 'Lasagne'))->toBeNull()
+        ->and(knotenMitRef($screen, 'wochenplan-spinner'))->toBeNull();
+});
+
+it('ersetzt beim erneuten Laden derselben Woche den gespeicherten Stand', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    $aufruf = 0;
+    $ausfall = false;
+
+    Http::fake(function () use (&$aufruf, &$ausfall) {
+        if ($ausfall) {
+            throw new ConnectionException('Zeitüberschreitung');
+        }
+
+        $aufruf++;
+
+        return Http::response(['items' => [
+            mealplanEintrag('2026-09-23', 'dinner', $aufruf === 1 ? 'Lasagne' : 'Chili sin Carne'),
+        ]]);
+    });
+
+    Native::visit('/wochenplan')->press('neuLaden');
+
+    wochenplanNeuStarten();
+    $ausfall = true;
+
+    $screen = Native::visit('/wochenplan');
+
+    expect(wochenplanZeile($screen, 'Chili sin Carne'))->not->toBeNull()
+        ->and(wochenplanZeile($screen, 'Lasagne'))->toBeNull();
+});
+
+it('ersetzt die gezeigten Einträge, sobald ein Neuladen gelingt', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+
+    $aufruf = 0;
+
+    Http::fake(function () use (&$aufruf) {
+        $aufruf++;
+
+        return Http::response(['items' => [
+            mealplanEintrag('2026-09-23', 'dinner', $aufruf === 1 ? 'Lasagne' : 'Ofengemüse'),
+        ]]);
+    });
+
+    $screen = Native::visit('/wochenplan')->press('neuLaden');
+
+    expect(wochenplanZeile($screen, 'Ofengemüse'))->not->toBeNull()
+        ->and(wochenplanZeile($screen, 'Lasagne'))->toBeNull();
+});
+
+/** Alle `ref`s des Baums in Render-Reihenfolge — so steht „unter“ im Wire-Tree. */
+function refReihenfolge(TestableComponent $screen): array
+{
+    $refs = [];
+
+    $walk = function (array $node) use (&$walk, &$refs): void {
+        if (isset($node['ref'])) {
+            $refs[] = $node['ref'];
+        }
+
+        foreach ($node['children'] ?? [] as $kind) {
+            $walk($kind);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return $refs;
+}
+
+it('zeigt bei einem Netzfehler das Banner mit dem Stand und behält die gecachten Einträge', function () {
+    CarbonImmutable::setTestNow('2026-09-23 14:05:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ]);
+
+    $screen = Native::visit('/wochenplan');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie nicht erreichbar · Stand 14:05')
+        ->assertSee('Erneut versuchen');
+
+    expect(wochenplanZeile($screen, 'Lasagne'))->not->toBeNull();
+});
+
+it('nennt im Banner auch das Datum, wenn der Stand von einem anderen Tag ist', function () {
+    CarbonImmutable::setTestNow('2026-09-22 18:30:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ]);
+
+    $screen = Native::visit('/wochenplan');
+
+    CarbonImmutable::setTestNow('2026-09-23 08:00:00');
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie nicht erreichbar · Stand 22.09. 18:30');
+});
+
+it('hängt das Banner unter die Wochen-Navigation und zeichnet es mit Warn-Icon', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ]);
+
+    $screen = Native::visit('/wochenplan', platform: 'android');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $refs = refReihenfolge($screen);
+
+    expect(array_search('woche-vor', $refs, true))
+        ->toBeLessThan(array_search('wochenplan-banner-aktion', $refs, true));
+
+    $screen->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'warning'
+        && ($node['props']['a11y_label'] ?? null) === 'Warnung');
+
+    expect(knotenMitRef($screen, 'wochenplan-banner-aktion')['props']['label'] ?? null)
+        ->toBe('Erneut versuchen');
+});
+
+it('lädt aus dem Banner heraus neu und nimmt es weg, sobald Mealie wieder antwortet', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ]);
+
+    $screen = Native::visit('/wochenplan');
+
+    $ausfall();
+    $screen->press('neuLaden');
+    $screen->assertSee('Mealie nicht erreichbar');
+
+    $ausfall(false);
+    $screen->tap('wochenplan-banner-aktion');
+
+    $screen->assertDontSee('Mealie nicht erreichbar');
+    expect(wochenplanZeile($screen, 'Lasagne'))->not->toBeNull();
+});
+
+it('meldet bei HTTP 401 ein ungültiges Token und führt aus dem Banner in die Einstellungen', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ], status: 401);
+
+    $screen = Native::visit('/wochenplan');
+
+    $ausfall();
+    $screen->press('neuLaden');
+
+    $screen->assertSee('Mealie-Token ungültig')
+        ->assertDontSee('Stand')
+        ->tap('wochenplan-banner-aktion')
+        ->assertNavigatedTo('/einstellungen');
+});
+
+it('zeigt für eine Woche ohne Cache das Banner und darunter einen Leerzustand', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+    Http::fake(fn () => throw new ConnectionException('Zeitüberschreitung'));
+
+    $screen = Native::visit('/wochenplan', platform: 'android');
+
+    $screen->assertSee('Mealie nicht erreichbar')
+        ->assertDontSee('Stand')
+        ->assertSee('Wochenplan konnte nicht geladen werden');
+
+    expect(tagesUeberschriften($screen))->toBe([])
+        ->and(knotenMitRef($screen, 'wochenplan-fehler-icon')['props']['name'] ?? null)->toBe('warning');
+
+    $refs = refReihenfolge($screen);
+
+    expect(array_search('wochenplan-banner-aktion', $refs, true))
+        ->toBeLessThan(array_search('wochenplan-fehler-icon', $refs, true));
+});
+
+it('behält beim Wochenwechsel die gecachte Woche und zeigt nur der leeren den Fehler-Leerzustand', function () {
+    CarbonImmutable::setTestNow('2026-09-23 10:00:00');
+
+    $ausfall = wochenplanAntwortetDannNicht([
+        '2026-09-21' => [mealplanEintrag('2026-09-23', 'dinner', 'Lasagne')],
+    ]);
+
+    $screen = Native::visit('/wochenplan');
+
+    $ausfall();
+    $screen->press('naechsteWoche');
+
+    $screen->assertSee('Wochenplan konnte nicht geladen werden');
+
+    $screen->press('vorherigeWoche');
+
+    $screen->assertDontSee('Wochenplan konnte nicht geladen werden');
+    expect(wochenplanZeile($screen, 'Lasagne'))->not->toBeNull();
 });

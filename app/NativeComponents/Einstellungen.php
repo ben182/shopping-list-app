@@ -5,6 +5,7 @@ namespace App\NativeComponents;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
 use App\Mealie\Verbindung;
+use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Events\Alert\ButtonPressed;
@@ -118,8 +119,9 @@ class Einstellungen extends NativeComponent
      * man es nur mit dem Zettel aus Mealie — also erst fragen, dann löschen.
      * Jeder andere Ausgang des Dialogs lässt den Keystore in Ruhe.
      *
-     * Mit dem Token geht auch der Mealie-Cache: was die App nicht mehr
-     * abrufen darf, soll sie auch nicht mehr aus der Schublade zeigen.
+     * Mit dem Token geht auch der Mealie-Cache — Einkaufsliste wie
+     * Wochenplan: was die App nicht mehr abrufen darf, soll sie auch nicht
+     * mehr aus der Schublade zeigen.
      */
     public function loeschenBestaetigen(): void
     {
@@ -137,6 +139,7 @@ class Einstellungen extends NativeComponent
 
             app(Token::class)->loeschen();
             app(Sitzung::class)->vergessen();
+            app(Wochenplansitzung::class)->vergessen();
 
             $this->verbindung = null;
 

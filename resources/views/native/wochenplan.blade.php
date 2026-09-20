@@ -1,6 +1,8 @@
 @use('App\Icons\Android')
 @use('App\Icons\Ios')
 
+@php($banner = $this->banner())
+
 <native:column class="w-full h-full bg-theme-background">
     {{-- Die Wochen-Navigation steht über allem anderen: sie bleibt stehen,
          egal ob darunter geladen wird, ein Leerzustand steht oder Tage. --}}
@@ -16,6 +18,36 @@
         </native:pressable>
     </native:row>
 
+    {{-- Direkt unter der Wochen-Navigation: was Mealie zuletzt verhindert hat.
+         Das Banner bleibt über den Tagen stehen, damit die gecachten Einträge
+         sichtbar bleiben, statt hinter einer Meldung zu verschwinden. --}}
+    @if (! $this->nichtVerbunden && $banner !== null)
+        <native:row class="w-full items-center gap-2 bg-theme-surface px-4 py-2">
+            <native:icon :ios="Ios::ExclamationmarkTriangle" :android="Android::Warning" :size="20" a11y-label="Warnung" class="text-theme-accent" />
+            <native:text class="flex-1 text-sm text-theme-on-surface-variant">{{ $banner->text() }}</native:text>
+            {{-- Zwei Knöpfe statt einem mit bedingtem Handler: ein `@if` in
+                 der Attributliste eines `native:`-Tags zerlegt der
+                 Precompiler. --}}
+            @if ($banner->tokenUngueltig())
+                <native:button
+                    ref="wochenplan-banner-aktion"
+                    size="sm"
+                    variant="secondary"
+                    label="{{ $banner->aktion() }}"
+                    @press="oeffneEinstellungen"
+                />
+            @else
+                <native:button
+                    ref="wochenplan-banner-aktion"
+                    size="sm"
+                    variant="secondary"
+                    label="{{ $banner->aktion() }}"
+                    @press="neuLaden"
+                />
+            @endif
+        </native:row>
+    @endif
+
     @if ($this->nichtVerbunden)
         <native:column class="w-full flex-1 items-center justify-center gap-3 px-8">
             <native:icon :ios="Ios::Calendar" :android="Android::CalendarMonth" :size="48" class="text-theme-on-surface-variant" />
@@ -27,6 +59,12 @@
                 label="Zu den Einstellungen"
                 @press="oeffneEinstellungen"
             />
+        </native:column>
+    @elseif ($this->zeigtFehlerLeerzustand())
+        {{-- Gescheitert, und für diese Woche liegt nichts in der Schublade. --}}
+        <native:column class="w-full flex-1 items-center justify-center gap-3 px-8">
+            <native:icon ref="wochenplan-fehler-icon" :ios="Ios::ExclamationmarkTriangle" :android="Android::Warning" :size="48" class="text-theme-on-surface-variant" />
+            <native:text class="text-center text-base text-theme-on-surface">Wochenplan konnte nicht geladen werden</native:text>
         </native:column>
     @elseif ($this->zeigtSpinner())
         <native:column class="w-full flex-1 items-center justify-center">

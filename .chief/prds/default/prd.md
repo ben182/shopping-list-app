@@ -190,16 +190,17 @@ Prefix: `EKL`.
 - [x] Ist kein Token hinterlegt, zeigt der Screen statt der Tage einen Leerzustand mit Kalender-Icon, dem Text „Mealie nicht verbunden“ und einem Button „Zu den Einstellungen“.
 
 ### EKL-012: Wochenplan-Cache und Fehlerzustand
+**Status:** done
 **Priority:** 12
 **Blocked by:** EKL-011
 **Description:** Als Nutzer möchte ich den zuletzt geladenen Wochenplan auch ohne Verbindung sehen, damit ich im Laden nachschauen kann, wofür ich einkaufe.
 
 **Acceptance Criteria:**
-- [ ] Jede erfolgreich geladene Woche wird lokal mit Zeitstempel gespeichert, pro Wochenbereich ein Eintrag; ein erneutes Laden derselben Woche ersetzt ihn.
-- [ ] Beim Wechsel auf eine Woche mit Cache werden die gecachten Einträge sofort angezeigt und nach erfolgreichem Neuladen ersetzt.
-- [ ] Schlägt das Laden fehl, bleiben gecachte Einträge sichtbar und unter der Wochen-Navigation erscheint das Banner „Mealie nicht erreichbar · Stand HH:MM“ mit „Erneut versuchen“; bei HTTP 401 „Mealie-Token ungültig“ mit „Einstellungen“ (gleiche Optik wie EKL-009).
-- [ ] Schlägt das Laden für eine Woche ohne Cache fehl, zeigt der Inhaltsbereich das Banner und darunter einen Leerzustand mit Warn-Icon und dem Text „Wochenplan konnte nicht geladen werden“.
-- [ ] Löschen des Tokens löscht alle gecachten Wochen.
+- [x] Jede erfolgreich geladene Woche wird lokal mit Zeitstempel gespeichert, pro Wochenbereich ein Eintrag; ein erneutes Laden derselben Woche ersetzt ihn.
+- [x] Beim Wechsel auf eine Woche mit Cache werden die gecachten Einträge sofort angezeigt und nach erfolgreichem Neuladen ersetzt.
+- [x] Schlägt das Laden fehl, bleiben gecachte Einträge sichtbar und unter der Wochen-Navigation erscheint das Banner „Mealie nicht erreichbar · Stand HH:MM“ mit „Erneut versuchen“; bei HTTP 401 „Mealie-Token ungültig“ mit „Einstellungen“ (gleiche Optik wie EKL-009).
+- [x] Schlägt das Laden für eine Woche ohne Cache fehl, zeigt der Inhaltsbereich das Banner und darunter einen Leerzustand mit Warn-Icon und dem Text „Wochenplan konnte nicht geladen werden“.
+- [x] Löschen des Tokens löscht alle gecachten Wochen.
 
 ### EKL-013: Automatisierte Tests der Kern-Flows
 **Priority:** 13

@@ -3,6 +3,7 @@
 namespace App\NativeComponents;
 
 use App\Mealie\Fehler;
+use App\Mealie\Fehlerzustand;
 use App\Mealie\Token;
 use App\Wochenplan\Plan;
 use App\Wochenplan\Sitzung;
@@ -104,6 +105,25 @@ class Wochenplan extends NativeComponent
     public function tage(): array
     {
         return Uebersicht::tage($this->woche(), app(Sitzung::class)->eintraege($this->montag));
+    }
+
+    /**
+     * Was das Banner unter der Wochen-Navigation sagt — `null`, solange
+     * Mealie mitspielt. Der Stand gehört der aufgeschlagenen Woche.
+     */
+    public function banner(): ?Fehlerzustand
+    {
+        return app(Sitzung::class)->fehlerzustand($this->montag);
+    }
+
+    /**
+     * Gescheitert und nichts in der Schublade: dann bleibt unter dem Banner
+     * nur der Hinweis, dass hier nichts zu holen war. Eine Woche mit Cache
+     * zeigt dagegen weiter ihre Einträge.
+     */
+    public function zeigtFehlerLeerzustand(): bool
+    {
+        return $this->banner() !== null && ! app(Sitzung::class)->hat($this->montag);
     }
 
     /**

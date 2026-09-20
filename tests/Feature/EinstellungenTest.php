@@ -2,6 +2,8 @@
 
 use App\Mealie\Cache;
 use App\Mealie\Sitzung;
+use App\Wochenplan\Cache as Wochenplancache;
+use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -266,4 +268,22 @@ it('wirft mit dem Token auch die gecachte Mealie-Liste weg', function () {
 
     expect(app(Cache::class)->artikel())->toBe([]);
     expect(app(Cache::class)->stand())->toBeNull();
+});
+
+it('wirft mit dem Token auch alle gecachten Wochen weg', function () {
+    fakeSecureStore('mealie-geheim-123');
+
+    app(Wochenplansitzung::class)->setzen('2026-09-21', [
+        ['id' => 'lasagne-1', 'datum' => '2026-09-23', 'typ' => 'dinner', 'rezeptName' => 'Lasagne', 'rezeptSlug' => 'lasagne'],
+    ]);
+    app(Wochenplansitzung::class)->setzen('2026-09-28', [
+        ['id' => 'chili-1', 'datum' => '2026-09-30', 'typ' => 'dinner', 'rezeptName' => 'Chili', 'rezeptSlug' => 'chili'],
+    ]);
+
+    Native::visit('/einstellungen')
+        ->press('loeschenBestaetigen')
+        ->emitNative(ButtonPressed::class, ['index' => 1, 'label' => 'Löschen']);
+
+    expect(app(Wochenplancache::class)->eintraege('2026-09-21'))->toBeNull()
+        ->and(app(Wochenplancache::class)->eintraege('2026-09-28'))->toBeNull();
 });

@@ -54,6 +54,16 @@
   gibt es dort nicht. Den Namen in der Komponente auswählen
   (`IconResolver::resolve(null, Ios::X, Android::Y)['icon'] ?? Android::Y->value`)
   und per `$this->view('name', [...])` ins Blade reichen.
+- **Ein zweites `Http::fake()` ersetzt das erste nicht**, es reiht sich
+  dahinter ein. Wechselnde Antworten innerhalb eines Tests brauchen *einen*
+  Fake mit Closure über einer `&$referenz`.
+- **Globale Testhelfer teilen einen Namensraum über alle Testdateien** — ein
+  Name, den es schon gibt, ist ein Fatal Error, kein Überschreiben.
+- **Persistenter Mealie-Cache:** Tabelle `mealie_cache`, ein Datensatz je
+  Schlüssel. `App\Mealie\Cache` hält `einkaufsliste`, `App\Wochenplan\Cache`
+  je Woche eine Zeile unter `wochenplan:<Montag>`; `leeren()` grenzt per
+  `like`-Präfix ab. `App\Mealie\Fehlerzustand` formuliert daraus das Banner
+  (Text + Knopf) und ist an keinen Screen gebunden.
 - **Bulk gegen Einzeln in `Http::fake()`:** `…/items/*` und `…/items` sind
   zwei getrennte Muster — das abschließende `*` darf leer sein, der `/`
   davor nicht fehlen. Wer eine Route vergisst, schickt eine echte Anfrage
@@ -1001,3 +1011,65 @@ Fehlerart für `pressable` und die vier neuen `list-item` — keine andere Art.
   über `ref` — Mealies IDs sind im Test Rauschen.
 ---
 <!-- chief-timing story="EKL-011" duration_ms=734571 cost=30.661304 in=230 out=790 cache_create=460215 cache_read=14646382 -->
+
+## 2026-09-20 - EKL-012
+
+Der Wochenplan überlebt jetzt Verbindungsabbruch und App-Neustart. Jede
+erfolgreich geladene Woche landet als eigene Zeile in `mealie_cache` —
+Schlüssel `wochenplan:<Montag>`, samt `geladen_am`; ein erneutes Laden
+derselben Woche ersetzt sie per `updateOrCreate`. Beim Wechsel auf eine Woche
+mit Cache stehen ihre Einträge sofort da (kein Spinner) und werden nach einer
+erfolgreichen Antwort ersetzt.
+
+Scheitert das Laden, bleiben die gecachten Einträge stehen und unter der
+Wochen-Navigation erscheint dasselbe Banner wie auf dem Einkaufen-Screen:
+Warn-Icon, „Mealie nicht erreichbar · Stand HH:MM“ und „Erneut versuchen“; bei
+HTTP 401 „Mealie-Token ungültig“ mit „Einstellungen“. Der Stand gehört der
+aufgeschlagenen Woche, nicht der App. Eine Woche ohne Cache zeigt unter dem
+Banner einen Leerzustand mit Warn-Icon und „Wochenplan konnte nicht geladen
+werden“. Das Löschen des Tokens wirft alle gecachten Wochen weg.
+
+**Dateien**
+
+- `app/Wochenplan/Cache.php` — neu, zweiter Nutzer der `mealie_cache`-Tabelle
+- `app/Wochenplan/Sitzung.php` — Cache injiziert, lazy Hydration je Woche, `fehlerzustand($schluessel)`
+- `app/NativeComponents/Wochenplan.php` — `banner()`, `zeigtFehlerLeerzustand()`
+- `resources/views/native/wochenplan.blade.php` — Banner + Fehler-Leerzustand
+- `app/NativeComponents/Einstellungen.php` — vergisst auch die Wochenplan-Sitzung
+- `tests/Feature/WochenplanTest.php` (+11 Tests), `tests/Feature/EinstellungenTest.php` (+1)
+
+183 Tests, 1228 Assertions, grün. Pint sauber. `native:validate` unverändert rot
+mit 19 × „Unknown native element type“ — keine andere Fehlerart.
+
+**Learnings für die nächsten Iterationen**
+
+- **Ein zweites `Http::fake()` im selben Test ersetzt das erste nicht**, es
+  legt seine Regel dahinter; die erste trifft weiter zuerst. Wer im Verlauf
+  eines Tests andere Antworten braucht, nimmt *einen* Fake mit einer Closure
+  über einer `&$referenz` (Zähler oder Ausfall-Schalter). Das gilt auch für
+  `Http::fake(fn () => throw …)` nach einem Muster-Fake.
+- **Globale Testhelfer teilen sich einen Namensraum über alle Testdateien.**
+  `appNeuStarten()` gibt es schon in `EinkaufenMealieTest.php`; der
+  Wochenplan braucht deshalb `wochenplanNeuStarten()`. Ein zweites
+  `function appNeuStarten()` wäre ein Fatal Error.
+- **„Kenne ich diese Woche?“ und „hat sie Einträge?“ sind zwei Fragen.** Der
+  Cache gibt `null` für „nie geladen“ und `[]` für „leer geladen“ zurück; in
+  der Sitzung hält ein `array_key_exists`-Eintrag mit Wert `null` fest, dass
+  schon im Cache nachgesehen wurde. Ohne die Unterscheidung fragte jede
+  `hat()`-Abfrage einer leeren Woche wieder die Datenbank — und der Spinner
+  liefe für eine leere Woche endlos.
+- **Beide Caches teilen sich `mealie_cache`**, getrennt nur durch das Präfix
+  `wochenplan:`. `Wochenplan\Cache::leeren()` löscht per `like 'wochenplan:%'`
+  und lässt die Einkaufsliste in Ruhe — wer eine dritte Sorte anlegt, muss
+  dasselbe Muster einhalten.
+- **`App\Mealie\Fehlerzustand` ist screen-unabhängig** und trägt jetzt beide
+  Banner. Neue Banner bekommen ihren Stand von außen gereicht; die Klasse
+  weiß nichts davon, welcher Cache ihn geliefert hat.
+- **Reihenfolge im Baum prüft man mit `refReihenfolge($screen)`** (neu in
+  `WochenplanTest.php`): alle `ref`s in Tiefensuche, also in Render-Reihenfolge.
+  Damit lässt sich „das Banner steht unter der Navigation“ als Indexvergleich
+  schreiben, ohne die Baumstruktur nachzubauen.
+- **Für den Screen gilt weiter: `$this->banner()` einmal oben ins Blade holen**
+  (`@php($banner = $this->banner())`) — jeder Aufruf geht sonst erneut an die
+  Sitzung und damit an den Cache.
+<!-- chief-timing story="EKL-012" duration_ms=376226 cost=10.015508 in=98 out=412 cache_create=199898 cache_read=4156700 -->
