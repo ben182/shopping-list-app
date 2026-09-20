@@ -30,6 +30,7 @@ final class ReleaseCommand extends Command
         {--skip-tests : Testlauf vor dem Build überspringen}
         {--skip-build : Bereits gebaute APK aus dem Ausgabeverzeichnis verwenden}
         {--draft : GitHub-Release als Entwurf anlegen}
+        {--prerelease : Release als Vorabversion markieren}
         {--notes= : Release-Notes; ohne Angabe generiert GitHub sie aus den Commits}';
 
     protected $description = 'Baut eine signierte APK und veröffentlicht sie als GitHub-Release für Obtainium';
@@ -91,7 +92,7 @@ final class ReleaseCommand extends Command
             return self::FAILURE;
         }
 
-        $apk = $this->gebauteApk($version, $versionCode);
+        $apk = $this->gebauteApk($version, $versionCode, $env);
 
         if ($apk === null) {
             return self::FAILURE;
@@ -186,7 +187,7 @@ final class ReleaseCommand extends Command
      * hineingeschrieben hat, die veröffentlicht werden soll, und nicht der
      * Debug-Schlüssel sie signiert hat.
      */
-    private function gebauteApk(Version $version, int $versionCode): ?string
+    private function gebauteApk(Version $version, int $versionCode, EnvDatei $env): ?string
     {
         $verzeichnis = base_path(self::AUSGABEVERZEICHNIS);
         $apks = glob($verzeichnis.'/*.apk') ?: [];
@@ -212,7 +213,7 @@ final class ReleaseCommand extends Command
             }
         }
 
-        if (! $this->istReleaseSigniert($apk)) {
+        if (! $this->istMitDemKeystoreSigniert($apk, $env)) {
             return null;
         }
 
@@ -220,27 +221,92 @@ final class ReleaseCommand extends Command
     }
 
     /**
-     * Eine debug-signierte APK ist die einzige wirklich unumkehrbare Panne:
-     * Wer sie installiert, kann sie nie mit einem echten Release aktualisieren,
-     * sondern muss deinstallieren — samt aller Daten auf dem Gerät.
+     * Prüft, dass die APK mit genau dem Keystore aus der `.env` signiert ist.
+     *
+     * Eine Signatur vom falschen Schlüssel ist die einzige wirklich
+     * unumkehrbare Panne: Wer die APK installiert, kann sie nie mit einem
+     * Release des anderen Schlüssels aktualisieren, sondern muss deinstallieren
+     * — samt aller Daten auf dem Gerät. `keytool -printcert -jarfile` taugt
+     * dafür nicht: Gradle signiert nur noch nach APK Signature Scheme v2/v3,
+     * und darin sieht keytool keine Signatur.
      */
-    private function istReleaseSigniert(string $apk): bool
+    private function istMitDemKeystoreSigniert(string $apk, EnvDatei $env): bool
     {
-        $zertifikat = Process::run(['keytool', '-printcert', '-jarfile', $apk]);
+        $apksigner = $this->apksigner();
 
-        if (! $zertifikat->successful()) {
-            $this->warn('keytool nicht gefunden — die Signatur der APK wurde nicht geprüft.');
+        if ($apksigner === null) {
+            $this->warn('apksigner nicht gefunden — die Signatur der APK wurde nicht geprüft.');
 
             return true;
         }
 
-        if (str_contains($zertifikat->output(), 'CN=Android Debug')) {
-            $this->error('Die APK ist mit dem Debug-Schlüssel signiert. Sie ließe sich auf den Geräten nie aktualisieren.');
+        $ergebnis = Process::run([$apksigner, 'verify', '--print-certs', $apk]);
+        $ausgabe = $ergebnis->output().$ergebnis->errorOutput();
+
+        if (! $ergebnis->successful()) {
+            if (str_contains($ausgabe, 'DOES NOT VERIFY') || str_contains($ausgabe, 'Missing META-INF')) {
+                $this->error('Die APK ist nicht gültig signiert:');
+                $this->line($ausgabe);
+
+                return false;
+            }
+
+            $this->warn('apksigner ließ sich nicht ausführen — die Signatur der APK wurde nicht geprüft.');
+
+            return true;
+        }
+
+        $erwartet = $this->keystoreFingerabdruck($env);
+
+        if ($erwartet === null) {
+            $this->warn('Fingerabdruck des Keystores nicht lesbar — die Signatur der APK wurde nicht geprüft.');
+
+            return true;
+        }
+
+        if (preg_match('/SHA-256 digest: ([0-9a-f]+)/i', $ausgabe, $treffer) !== 1) {
+            $this->warn('apksigner nennt keinen SHA-256-Fingerabdruck — die Signatur der APK wurde nicht geprüft.');
+
+            return true;
+        }
+
+        if (! hash_equals($erwartet, strtolower($treffer[1]))) {
+            $this->error('Die APK ist mit einem anderen Schlüssel signiert als dem aus der .env. Sie ließe sich auf den Geräten nie aktualisieren.');
 
             return false;
         }
 
         return true;
+    }
+
+    /** Der neueste `apksigner` aus den Build-Tools des Android-SDK. */
+    private function apksigner(): ?string
+    {
+        $sdk = getenv('ANDROID_HOME') ?: getenv('ANDROID_SDK_ROOT') ?: getenv('HOME').'/Library/Android/sdk';
+        $kandidaten = glob($sdk.'/build-tools/*/apksigner') ?: [];
+
+        usort($kandidaten, fn (string $a, string $b) => version_compare(basename(dirname($a)), basename(dirname($b))));
+
+        return $kandidaten === [] ? null : end($kandidaten);
+    }
+
+    /** SHA-256 des Zertifikats im Keystore, in Kleinbuchstaben ohne Doppelpunkte. */
+    private function keystoreFingerabdruck(EnvDatei $env): ?string
+    {
+        $keystore = $env->lesen('ANDROID_KEYSTORE_FILE');
+        $passwort = $env->lesen('ANDROID_KEYSTORE_PASSWORD');
+
+        if ($keystore === null || $passwort === null) {
+            return null;
+        }
+
+        $ergebnis = Process::run(['keytool', '-list', '-v', '-keystore', $this->absolut($keystore), '-storepass', $passwort]);
+
+        if (! $ergebnis->successful() || preg_match('/SHA256: ([0-9A-F:]+)/i', $ergebnis->output(), $treffer) !== 1) {
+            return null;
+        }
+
+        return strtolower(str_replace(':', '', $treffer[1]));
     }
 
     private function veroeffentlichen(Version $version, string $asset): int
@@ -261,8 +327,10 @@ final class ReleaseCommand extends Command
             ? ['--notes', $notizen]
             : ['--generate-notes']);
 
-        if ($this->option('draft')) {
-            $befehl[] = '--draft';
+        foreach (['draft', 'prerelease'] as $schalter) {
+            if ($this->option($schalter)) {
+                $befehl[] = '--'.$schalter;
+            }
         }
 
         $release = Process::path(base_path())->timeout(1800)->run($befehl);

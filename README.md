@@ -205,6 +205,7 @@ die APK vorliegt.
 | `--skip-tests` | Testlauf überspringen |
 | `--skip-build` | vorhandene APK aus dem Ausgabeverzeichnis nehmen |
 | `--draft` | Release als Entwurf anlegen |
+| `--prerelease` | Release als Vorabversion markieren |
 | `--notes="…"` | eigene Release-Notes statt der aus den Commits generierten |
 
 **In Obtainium einmalig einrichten:** *Add App* -> Repo-URL ->
@@ -213,8 +214,9 @@ Source `GitHub`, App-ID zur Verifikation `de.ben182.einkaufsliste`.
 Drei Dinge, an denen Updates still scheitern:
 
 - **Ein anderer Keystore.** Android lehnt das Update dann ab; die App muss
-  deinstalliert werden und nimmt die Daten mit. Deshalb bricht `release` ab, wenn
-  die Signierungs-Variablen fehlen oder die APK auf `CN=Android Debug` läuft.
+  deinstalliert werden und nimmt die Daten mit. Deshalb vergleicht `release` den
+  SHA-256 der APK-Signatur (`apksigner verify`) mit dem Zertifikat im Keystore
+  aus der `.env` und bricht bei Abweichung ab.
 - **Ein nicht erhöhter `NATIVEPHP_APP_VERSION_CODE`.** Obtainium bietet das Update
   an, Android hält es für bereits installiert. Das Kommando zählt ihn selbst hoch.
 - **Ein AAB statt einer APK.** Obtainium installiert nur APKs — also nie
