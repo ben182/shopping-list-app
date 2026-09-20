@@ -179,6 +179,50 @@ php artisan native:package android --build-type=bundle   # AAB für den Play Sto
 
 Die Artefakte landen unter `nativephp/android/app/build/outputs/`.
 
+### Veröffentlichen für Obtainium
+
+Verteilt wird über GitHub-Releases: [Obtainium](https://obtainium.imranr.dev) beobachtet
+das Repo, vergleicht den Tag-Namen mit der installierten Version und lädt die APK aus
+den Release-Assets. `php artisan release` macht den ganzen Weg in einem Kommando.
+
+```sh
+php artisan release              # Patch-Stelle hoch: 1.0.0 -> 1.0.1
+php artisan release --minor      # 1.0.1 -> 1.1.0
+php artisan release 2.0.0        # feste Version (beim ersten Mal nötig)
+```
+
+Der Ablauf, in dieser Reihenfolge: Vorbedingungen prüfen (sauberes
+Arbeitsverzeichnis, Tag noch frei, `gh` angemeldet, Keystore-Variablen gesetzt) —
+Tests — `NATIVEPHP_APP_VERSION` und `NATIVEPHP_APP_VERSION_CODE` in der `.env`
+setzen — `native:package android` — prüfen, dass die gebaute APK die erwartete
+Version trägt und nicht debug-signiert ist — Tag setzen und pushen — Release mit
+der APK als `einkaufsliste-<version>.apk` anlegen. Bricht der Build ab, werden
+Version und Version-Code in der `.env` zurückgesetzt; ein Tag entsteht erst, wenn
+die APK vorliegt.
+
+| Flag | Wirkung |
+| --- | --- |
+| `--skip-tests` | Testlauf überspringen |
+| `--skip-build` | vorhandene APK aus dem Ausgabeverzeichnis nehmen |
+| `--draft` | Release als Entwurf anlegen |
+| `--notes="…"` | eigene Release-Notes statt der aus den Commits generierten |
+
+**In Obtainium einmalig einrichten:** *Add App* -> Repo-URL ->
+Source `GitHub`, App-ID zur Verifikation `de.ben182.einkaufsliste`.
+
+Drei Dinge, an denen Updates still scheitern:
+
+- **Ein anderer Keystore.** Android lehnt das Update dann ab; die App muss
+  deinstalliert werden und nimmt die Daten mit. Deshalb bricht `release` ab, wenn
+  die Signierungs-Variablen fehlen oder die APK auf `CN=Android Debug` läuft.
+- **Ein nicht erhöhter `NATIVEPHP_APP_VERSION_CODE`.** Obtainium bietet das Update
+  an, Android hält es für bereits installiert. Das Kommando zählt ihn selbst hoch.
+- **Ein AAB statt einer APK.** Obtainium installiert nur APKs — also nie
+  `--build-type=bundle` veröffentlichen.
+
+Die APK enthält nur `arm64-v8a` (`nativephp/android/app/build.gradle.kts`). Auf
+echten Geräten ist das unkritisch, x86-Emulatoren installieren sie nicht.
+
 ### Wo die Geheimnisse bleiben
 
 - **`credentials/` ist gitignored** (`.gitignore`, zusammen mit `*.keystore` und
