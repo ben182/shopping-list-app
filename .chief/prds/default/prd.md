@@ -26,18 +26,19 @@ Der Datenbestand der eigenen Liste liegt **lokal auf dem Gerät** (SQLite). Es g
 Prefix: `EKL`.
 
 ### EKL-001: App-Grundgerüst mit drei Tabs
+**Status:** done
 **Priority:** 1
 **Description:** Als Nutzer möchte ich die App auf meinem Android-Gerät starten und zwischen den drei Bereichen Einkaufen, Vorrat und Wochenplan wechseln, damit die Grundstruktur der App steht.
 
 **Acceptance Criteria:**
-- [ ] Ein neues Laravel-13-Projekt mit `nativephp/mobile` (^4.5) und `nativephp/mobile-ui` (^0.3) liegt in `/Users/ben/Code/shopping-list-app`; die App heißt auf dem Homescreen „Einkaufsliste“, die Bundle-ID ist `de.ben182.einkaufsliste`.
-- [ ] Nach dem Start erscheint eine native Tab-Leiste mit genau drei Tabs in dieser Reihenfolge: „Einkaufen“ (Einkaufswagen-Icon), „Vorrat“ (Archiv-/Inventar-Icon), „Wochenplan“ (Kalender-Icon). Jeder Tab zeigt einen Screen mit einem Titel in der Top-Bar.
-- [ ] Der Einkaufen-Tab ist beim Start aktiv; die Top-Bar des Einkaufen-Tabs enthält rechts eine Zahnrad-Action „Einstellungen“ (mit `a11y-label`), die einen noch leeren Einstellungen-Screen als gepushten Screen mit Zurück-Navigation öffnet.
-- [ ] Die Primärfarbe des Themes ist Indigo (`#4F46E5` hell, `#818CF8` dunkel); aktive Tab-Icons, Buttons und Checkboxen erscheinen in dieser Farbe.
-- [ ] Die App folgt dem System-Dark-Mode: Umschalten des System-Themes wechselt Hintergrund und Textfarben aller Screens ohne Neustart.
-- [ ] Die Ausrichtung ist auf Hochformat begrenzt.
-- [ ] Die `.env.example` enthält leere Platzhalter für `NATIVEPHP_APP_ID`, `NATIVEPHP_APP_VERSION`, `NATIVEPHP_APP_VERSION_CODE`, `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` sowie `MEALIE_URL` (vorbelegt mit `https://mealie.example.test`) und `MEALIE_SHOPPING_LIST_ID` (vorbelegt mit `00000000-0000-4000-8000-000000000000`).
-- [ ] Es gibt keine Livewire-, Inertia- oder WebView-Screens; alle Screens sind `NativeComponent`-Klassen mit Edge-Blade-Views.
+- [x] Ein neues Laravel-13-Projekt mit `nativephp/mobile` (^4.5) und `nativephp/mobile-ui` (^0.3) liegt in `/Users/ben/Code/shopping-list-app`; die App heißt auf dem Homescreen „Einkaufsliste“, die Bundle-ID ist `de.ben182.einkaufsliste`.
+- [x] Nach dem Start erscheint eine native Tab-Leiste mit genau drei Tabs in dieser Reihenfolge: „Einkaufen“ (Einkaufswagen-Icon), „Vorrat“ (Archiv-/Inventar-Icon), „Wochenplan“ (Kalender-Icon). Jeder Tab zeigt einen Screen mit einem Titel in der Top-Bar.
+- [x] Der Einkaufen-Tab ist beim Start aktiv; die Top-Bar des Einkaufen-Tabs enthält rechts eine Zahnrad-Action „Einstellungen“ (mit `a11y-label`), die einen noch leeren Einstellungen-Screen als gepushten Screen mit Zurück-Navigation öffnet.
+- [x] Die Primärfarbe des Themes ist Indigo (`#4F46E5` hell, `#818CF8` dunkel); aktive Tab-Icons, Buttons und Checkboxen erscheinen in dieser Farbe.
+- [x] Die App folgt dem System-Dark-Mode: Umschalten des System-Themes wechselt Hintergrund und Textfarben aller Screens ohne Neustart.
+- [x] Die Ausrichtung ist auf Hochformat begrenzt.
+- [x] Die `.env.example` enthält leere Platzhalter für `NATIVEPHP_APP_ID`, `NATIVEPHP_APP_VERSION`, `NATIVEPHP_APP_VERSION_CODE`, `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` sowie `MEALIE_URL` (vorbelegt mit `https://mealie.example.test`) und `MEALIE_SHOPPING_LIST_ID` (vorbelegt mit `00000000-0000-4000-8000-000000000000`).
+- [x] Es gibt keine Livewire-, Inertia- oder WebView-Screens; alle Screens sind `NativeComponent`-Klassen mit Edge-Blade-Views.
 
 ### EKL-002: Vorrat anzeigen und Artikel auf die Liste setzen
 **Priority:** 2

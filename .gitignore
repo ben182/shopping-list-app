@@ -26,6 +26,7 @@ yarn-error.log
 # NativePHP
 /nativephp
 /build
+/credentials
 *.keystore
 *.jks
 
