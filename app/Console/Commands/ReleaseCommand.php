@@ -94,6 +94,11 @@ final class ReleaseCommand extends Command
             return self::FAILURE;
         }
 
+        // `native:package` zählt den Version-Code in der .env selbst noch einmal
+        // hoch. Ohne diese Korrektur stünde dort ein Code, den keine APK trägt,
+        // und das nächste Release übersprünge eine Nummer.
+        $env->schreiben(['NATIVEPHP_APP_VERSION_CODE' => $versionCode]);
+
         $apk = $this->gebauteApk($version, $versionCode, $env);
 
         if ($apk === null) {
@@ -377,7 +382,8 @@ final class ReleaseCommand extends Command
         $this->newLine();
         $this->components->info('Veröffentlicht: '.trim($release->output()));
         $this->line('  Obtainium holt die APK beim nächsten Update-Check. Beim ersten Mal:');
-        $this->line('  <comment>Add App</comment> → '.trim($this->git(['remote', 'get-url', 'origin'])->output()));
+        $repo = preg_replace('/\.git$/', '', trim($this->git(['remote', 'get-url', 'origin'])->output()));
+        $this->line('  <comment>Add App</comment> → '.$repo);
 
         return self::SUCCESS;
     }
