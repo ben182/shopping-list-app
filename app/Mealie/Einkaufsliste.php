@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Http;
 final class Einkaufsliste
 {
     /**
-     * @return array{artikel: list<array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool}>}|array{fehler: string}
+     * @return array{artikel: list<array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool, roh: array<string, mixed>}>}|array{fehler: string}
      */
     public static function laden(string $basisUrl, string $token, string $listenId, int $timeout): array
     {
@@ -70,7 +70,7 @@ final class Einkaufsliste
     /**
      * @param  array<string, mixed>  $eintrag
      * @param  array<string, string>  $rezeptnamen
-     * @return array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool}
+     * @return array{id: string, text: string, label: ?string, rezepte: ?string, abgehakt: bool, roh: array<string, mixed>}
      */
     private static function eintrag(array $eintrag, array $rezeptnamen): array
     {
@@ -87,6 +87,7 @@ final class Einkaufsliste
             'label' => is_string($label) && $label !== '' ? $label : null,
             'rezepte' => $rezepte === [] ? null : implode(' · ', $rezepte),
             'abgehakt' => (bool) ($eintrag['checked'] ?? false),
+            'roh' => $eintrag,
         ];
     }
 

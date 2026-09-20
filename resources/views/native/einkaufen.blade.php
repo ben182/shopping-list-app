@@ -25,20 +25,25 @@
     @endif
 
     @if ($this->abschnitte === [])
-        <native:column class="w-full flex-1 items-center justify-center gap-3 px-8">
+        {{-- Bleibt der Abschnitt „Abgehakt“ darunter stehen, teilt er sich den
+             Platz mit dem Leerzustand, statt ihn zu verdrängen. --}}
+        <native:column class="w-full {{ $this->abgehakte === [] ? 'flex-1' : 'py-10' }} items-center justify-center gap-3 px-8">
             <native:icon :ios="Ios::Cart" :android="Android::ShoppingCart" :size="48" class="text-theme-on-surface-variant" />
             <native:text class="text-center text-base text-theme-on-surface">Liste ist leer.</native:text>
             <native:text class="text-center text-sm text-theme-on-surface-variant">
                 Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.
             </native:text>
         </native:column>
-    @else
+    @endif
+
+    @if ($this->abschnitte !== [] || $this->abgehakte !== [])
         <native:list separator on-refresh="neuLaden" class="w-full flex-1 bg-theme-background">
             @foreach ($this->abschnitte as $abschnitt)
                 {{-- Die Überschrift hängt am Abschnitt: fällt der Abschnitt weg, fällt sie mit. --}}
                 <native:list-section header="{{ $abschnitt->name }}">
                     @foreach ($abschnitt->zeilen as $zeile)
                         @if ($zeile->ausMealie)
+                            @php($umschalten = "mealieUmschalten('{$zeile->id}')")
                             {{-- Das Besteck-Icon bleibt ohne eigene Farbe: die Renderer
                                  zeichnen ein Trailing-Icon von sich aus in der gedämpften
                                  Sekundärfarbe, und eine feste Farbe hier hätte keine
@@ -52,6 +57,7 @@
                                 :trailingIconIos="Ios::ForkKnife"
                                 :trailingIconAndroid="Android::Restaurant"
                                 trailing-a11y-label="aus Mealie"
+                                @press="{{ $umschalten }}"
                             />
                         @else
                             {{-- Der Handler-Aufruf steht in einer Variablen, weil ein Argument in
@@ -69,6 +75,40 @@
                     @endforeach
                 </native:list-section>
             @endforeach
+
+            {{-- Der Abschnitt „Abgehakt“ hängt ohne `list-section` am Ende der
+                 Liste: seine Überschrift muss tappbar sein, und die eines
+                 Abschnitts ist es nicht. --}}
+            @if ($this->abgehakte !== [])
+                @php($aufgeklappt = $this->abgehakteAufgeklappt())
+                @php($chevronIos = $aufgeklappt ? Ios::ChevronUp : Ios::ChevronDown)
+                @php($chevronAndroid = $aufgeklappt ? Android::ExpandLess : Android::ExpandMore)
+                <native:list-item
+                    ref="abgehakt-kopf"
+                    headline="Abgehakt ({{ count($this->abgehakte) }})"
+                    :trailingIconIos="$chevronIos"
+                    :trailingIconAndroid="$chevronAndroid"
+                    trailing-a11y-label="{{ $aufgeklappt ? 'Zuklappen' : 'Aufklappen' }}"
+                    @press="abgehakteUmklappen"
+                />
+
+                @if ($aufgeklappt)
+                    @foreach ($this->abgehakte as $zeile)
+                        @php($umschalten = "mealieUmschalten('{$zeile->id}')")
+                        {{-- Gedämpft über den Theme-Wert der aktuellen
+                             Darstellung: `headline-color` kennt keine eigene
+                             Dark-Mode-Hälfte, `theme()` löst sie schon hier auf. --}}
+                        <native:list-item
+                            native:key="{{ $zeile->id }}"
+                            ref="abgehakt-{{ $zeile->id }}"
+                            headline="{{ $zeile->text }}"
+                            :leadingCheckbox="true"
+                            :headlineColor="theme('on-surface-variant', '#475569')"
+                            @press="{{ $umschalten }}"
+                        />
+                    @endforeach
+                @endif
+            @endif
         </native:list>
     @endif
 </native:column>

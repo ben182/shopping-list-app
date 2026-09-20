@@ -130,18 +130,19 @@ Prefix: `EKL`.
 - [x] Nach dem Speichern eines Tokens in den Einstellungen und Zurückkehren lädt der Einkaufen-Screen die Mealie-Liste ohne weiteres Zutun.
 
 ### EKL-008: Mealie-Artikel abhaken und zurückholen
+**Status:** done
 **Priority:** 8
 **Blocked by:** EKL-007
 **Description:** Als Nutzer möchte ich Mealie-Artikel mit derselben Geste wie eigene Artikel abhaken und versehentlich Abgehaktes zurückholen, damit ich beim Einkaufen nicht die Mealie-Web-UI brauche.
 
 **Acceptance Criteria:**
-- [ ] Tap auf eine Mealie-Zeile entfernt sie sofort aus ihrer Gruppe (optimistisch) und sendet das Abhaken an Mealie (`PUT /api/households/shopping/items/{itemId}` mit `checked: true`, restliche Felder unverändert). Der Untertitel-Zähler sinkt sofort.
-- [ ] Am Ende der Liste erscheint ein Abschnitt „Abgehakt (n)“ mit n = Anzahl abgehakter Mealie-Artikel, standardmäßig eingeklappt; der Abschnitt fehlt, wenn n = 0. Tap auf die Abschnitts-Überschrift klappt ihn auf oder zu (Chevron-Icon zeigt den Zustand). Der Auf-/Zu-Zustand bleibt innerhalb einer App-Sitzung erhalten.
-- [ ] Aufgeklappt zeigt der Abschnitt die abgehakten Mealie-Artikel als Zeilen mit angehakter Checkbox, gedämpfter Textfarbe und `display`-Text, ohne Gruppierung, in der Reihenfolge von Mealie.
-- [ ] Tap auf eine abgehakte Zeile holt den Artikel sofort zurück in seine Gruppe (optimistisch) und sendet `checked: false` an Mealie.
-- [ ] Schlägt ein Abhaken oder Zurückholen fehl (HTTP-Fehler, Timeout), springt der Artikel in seinen vorherigen Zustand zurück und ein Toast „Mealie: Änderung fehlgeschlagen“ erscheint.
-- [ ] Nach einem erfolgreichen Abhaken zeigt die Mealie-Web-UI den Artikel als abgehakt (manueller Test).
-- [ ] Eigene Artikel erscheinen nie im Abschnitt „Abgehakt“; sie werden weiterhin durch Tap in den Vorrat zurückgeschickt.
+- [x] Tap auf eine Mealie-Zeile entfernt sie sofort aus ihrer Gruppe (optimistisch) und sendet das Abhaken an Mealie (`PUT /api/households/shopping/items/{itemId}` mit `checked: true`, restliche Felder unverändert). Der Untertitel-Zähler sinkt sofort.
+- [x] Am Ende der Liste erscheint ein Abschnitt „Abgehakt (n)“ mit n = Anzahl abgehakter Mealie-Artikel, standardmäßig eingeklappt; der Abschnitt fehlt, wenn n = 0. Tap auf die Abschnitts-Überschrift klappt ihn auf oder zu (Chevron-Icon zeigt den Zustand). Der Auf-/Zu-Zustand bleibt innerhalb einer App-Sitzung erhalten.
+- [x] Aufgeklappt zeigt der Abschnitt die abgehakten Mealie-Artikel als Zeilen mit angehakter Checkbox, gedämpfter Textfarbe und `display`-Text, ohne Gruppierung, in der Reihenfolge von Mealie.
+- [x] Tap auf eine abgehakte Zeile holt den Artikel sofort zurück in seine Gruppe (optimistisch) und sendet `checked: false` an Mealie.
+- [x] Schlägt ein Abhaken oder Zurückholen fehl (HTTP-Fehler, Timeout), springt der Artikel in seinen vorherigen Zustand zurück und ein Toast „Mealie: Änderung fehlgeschlagen“ erscheint.
+- [x] Nach einem erfolgreichen Abhaken zeigt die Mealie-Web-UI den Artikel als abgehakt (manueller Test).
+- [x] Eigene Artikel erscheinen nie im Abschnitt „Abgehakt“; sie werden weiterhin durch Tap in den Vorrat zurückgeschickt.
 
 ### EKL-009: Mealie-Cache und Fehlerzustand auf dem Einkaufen-Screen
 **Priority:** 9

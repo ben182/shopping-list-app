@@ -6,6 +6,7 @@ use App\Katalog\Artikel;
 use App\Katalog\Gruppe;
 use App\Katalog\Katalog;
 use App\Liste\EigeneListe;
+use App\Mealie\Eintrag;
 use App\Mealie\Gruppenzuordnung;
 use App\Mealie\Sitzung;
 
@@ -53,6 +54,21 @@ final class Uebersicht
             fn (string $name) => new Abschnitt($name, array_values($zeilen[$name])),
             $this->reihenfolge(array_keys($zeilen)),
         ));
+    }
+
+    /**
+     * Die abgehakten Mealie-Artikel — ohne Gruppierung, in Mealies
+     * Reihenfolge. Eigene Artikel sind nie dabei: die wandern beim Abhaken
+     * zurück in den Vorrat, statt liegen zu bleiben.
+     *
+     * @return list<Zeile>
+     */
+    public function abgehakte(): array
+    {
+        return array_map(
+            fn (Eintrag $eintrag) => new Zeile($eintrag->id, $eintrag->text, null, ausMealie: true),
+            $this->mealie->abgehakte(),
+        );
     }
 
     /**

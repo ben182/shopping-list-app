@@ -4,9 +4,11 @@ namespace App\NativeComponents;
 
 use App\Einkaufen\Abschnitt;
 use App\Einkaufen\Uebersicht;
+use App\Einkaufen\Zeile;
 use App\Icons\Android;
 use App\Icons\Ios;
 use App\Liste\EigeneListe;
+use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
@@ -121,11 +123,77 @@ class Einkaufen extends NativeComponent
         return $this->uebersicht()->abschnitte();
     }
 
+    /**
+     * Die abgehakten Mealie-Artikel — der Abschnitt am Ende der Liste.
+     *
+     * @return list<Zeile>
+     */
+    #[Computed]
+    public function abgehakte(): array
+    {
+        return $this->uebersicht()->abgehakte();
+    }
+
+    public function abgehakteAufgeklappt(): bool
+    {
+        return app(Sitzung::class)->abgehakteAufgeklappt();
+    }
+
+    public function abgehakteUmklappen(): void
+    {
+        app(Sitzung::class)->abgehakteUmklappen();
+    }
+
     public function abhaken(string $artikelId): void
     {
         $this->liste()->entfernen($artikelId);
 
         unset($this->abschnitte);
+    }
+
+    /**
+     * Ein Tap auf eine Mealie-Zeile — abhaken, wenn sie offen war, sonst
+     * zurückholen. Die Liste springt sofort, Mealie erfährt es nebenher;
+     * widerspricht Mealie, springt sie zurück.
+     */
+    public function mealieUmschalten(string $artikelId): void
+    {
+        $eintrag = app(Sitzung::class)->finden($artikelId);
+
+        if ($eintrag === null) {
+            return;
+        }
+
+        $token = $this->mealieToken();
+
+        if ($token === null) {
+            $this->mealieAenderungGescheitert();
+
+            return;
+        }
+
+        $abgehakt = ! $eintrag->abgehakt;
+
+        app(Sitzung::class)->haken($artikelId, $abgehakt);
+
+        $this->listeNeuZeichnen();
+
+        $basisUrl = (string) config('mealie.url');
+        $timeout = (int) config('mealie.timeout');
+        $artikel = $eintrag->roh;
+
+        $this->async(static fn (): array => Artikelstatus::setzen($basisUrl, $token, $timeout, $artikel, $abgehakt))
+            ->timeout($timeout + 5)
+            ->finished(function (array $ergebnis) use ($artikelId, $abgehakt): void {
+                if ($ergebnis['ok'] ?? false) {
+                    return;
+                }
+
+                $this->mealieAenderungZuruecknehmen($artikelId, $abgehakt);
+            })
+            ->failed(function () use ($artikelId, $abgehakt): void {
+                $this->mealieAenderungZuruecknehmen($artikelId, $abgehakt);
+            });
     }
 
     /**
@@ -207,11 +275,42 @@ class Einkaufen extends NativeComponent
                     app(Sitzung::class)->setzen($ergebnis['artikel']);
                 }
 
-                unset($this->abschnitte);
+                $this->listeNeuZeichnen();
             })
             ->failed(function (): void {
                 $this->mealieLaedt = false;
             });
+    }
+
+    /**
+     * Mealie hat die Änderung nicht angenommen: der Artikel springt in den
+     * Zustand zurück, in dem er vor dem Tap war.
+     */
+    private function mealieAenderungZuruecknehmen(string $artikelId, bool $abgehakt): void
+    {
+        app(Sitzung::class)->haken($artikelId, ! $abgehakt);
+
+        $this->listeNeuZeichnen();
+
+        $this->mealieAenderungGescheitert();
+    }
+
+    private function mealieAenderungGescheitert(): void
+    {
+        Dialog::toast('Mealie: Änderung fehlgeschlagen');
+    }
+
+    private function mealieToken(): ?string
+    {
+        $ergebnis = app(Token::class)->lesen();
+
+        return $ergebnis->found() ? (string) $ergebnis->value : null;
+    }
+
+    /** Beide Computed-Werte hängen an denselben Daten. */
+    private function listeNeuZeichnen(): void
+    {
+        unset($this->abschnitte, $this->abgehakte);
     }
 
     private function liste(): EigeneListe

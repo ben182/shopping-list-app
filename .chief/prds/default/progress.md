@@ -75,6 +75,16 @@
   „suspended" und wirft bei jeder Interaktion. Also
   `$neu = $alt->tap('Tab')->assertReplacedWith('/x')->follow();` und ab da nur
   noch mit `$neu` weiterarbeiten.
+- **Aufklappbare Abschnitte** gibt es nicht als Element: `list-section` hat
+  keine tappbare Überschrift. Kopfzeile und Zeilen als lose `list-item`
+  direkt in die `native:list` hängen — der Renderer mischt das mit
+  Abschnitten. Zustand, der den Remount überleben soll, in ein Singleton.
+- **Farben an `list-item`-Props** (`headline-color`, …) haben keine
+  Dark-Mode-Entsprechung. Statt eines festen Werts den Helfer
+  `theme('on-surface-variant')` benutzen: er löst beim Rendern nach der
+  aktuellen Darstellung auf.
+- **`Http::fake([...])` lässt unpassende Anfragen ins echte Netz.** Jede
+  Route, die der Test auslösen kann, braucht ein eigenes Muster.
 - **Callback mit String-Argument** nie direkt ins Attribut schreiben
   (`@press="tu('{{ $id }}')"` bricht den Validator). Stattdessen
   `@php($press = "tu('{$id}')")` und `@press="{{ $press }}"`.
@@ -640,3 +650,86 @@ ersten `native:run` kompiliert.
 - Für EKL-008/010: Mealie-Zeilen haben schon `ref="mealie-<itemId>"` und
   tragen die Mealie-Artikel-ID; `Sitzung::alle()` liefert auch die abgehakten.
 <!-- chief-timing story="EKL-007" duration_ms=1121031 cost=69.944824 in=538 out=2271 cache_create=766285 cache_read=36932390 -->
+
+## 2026-09-20 - EKL-008
+
+Mealie-Zeilen sind jetzt tappbar. Ein Tap legt den Haken sofort lokal um
+(`Sitzung::haken()`), zeichnet Liste und Untertitel neu und schickt über
+`async` ein `PUT /api/households/shopping/items/{id}` mit Mealies eigener
+Artikeldarstellung plus umgelegtem `checked`. Antwortet Mealie nicht mit
+2xx (oder läuft der Aufruf in einen `ConnectionException`), springt der
+Artikel zurück und `Dialog::toast('Mealie: Änderung fehlgeschlagen')`
+meldet es. Abgehaktes sammelt sich in einem einklappbaren Block am Ende
+der Liste („Abgehakt (n)“, Chevron zeigt den Zustand, standardmäßig zu);
+der Auf-/Zu-Zustand liegt in der `Sitzung` und überlebt den Tab-Wechsel.
+
+**Dateien**
+
+- `app/Mealie/Artikelstatus.php` — neu, der PUT
+- `app/Mealie/Eintrag.php` — trägt jetzt `roh` (Mealies ganze Darstellung)
+  und hat `mitHaken()`
+- `app/Mealie/Einkaufsliste.php` — reicht `roh` durch
+- `app/Mealie/Sitzung.php` — `abgehakte()`, `finden()`, `haken()`,
+  `abgehakteAufgeklappt()`, `abgehakteUmklappen()`
+- `app/Einkaufen/Uebersicht.php` — `abgehakte()`
+- `app/NativeComponents/Einkaufen.php` — `mealieUmschalten()`,
+  `abgehakte` (Computed), `listeNeuZeichnen()`
+- `resources/views/native/einkaufen.blade.php`
+- `tests/Feature/EinkaufenMealieTest.php` — 9 neue Tests
+
+123 Tests, 797 Assertions, grün. Pint sauber. `native:validate` rot mit 11
+„Unknown native element type“-Meldungen (zwei mehr als nach EKL-007: die
+beiden neuen `list-item`-Varianten), keine andere Fehlerart.
+
+**Manueller Gegentest an der echten Instanz** (Stand 2026-09-20): PUT mit
+`{...artikel, checked: true}` auf `/api/households/shopping/items/{id}`
+antwortet 200, der anschließende GET der Liste zeigt `checked: true`,
+`display` und `label` unverändert; der Rückweg mit `checked: false`
+stellt den Ausgangszustand wieder her (9 offene Artikel vorher wie
+nachher). Die Web-UI liest denselben Zustand.
+
+**Learnings für die nächsten Iterationen**
+
+- **`list-section`-Überschriften sind nicht tappbar** (`ListSection` kennt nur
+  `header`/`footer`, keinen Callback). Ein aufklappbarer Abschnitt wird
+  deshalb aus einer `list-item`-Kopfzeile plus Zeilen gebaut, die *direkt*
+  in der `native:list` hängen. Der Android-Renderer mischt Abschnitte und
+  lose Zeilen problemlos (`ListRenderer.kt`: alles, was kein `list_section`
+  ist, wird als eigenes `item` gezeichnet).
+- **`listenAbschnitte()` sieht nur `list_section`-Knoten.** Lose Zeilen am
+  Listenende liest der neue Helfer `abgehaktBlock()` / `abgehaktZeilen()`
+  aus den direkten `list_item`-Kindern der Liste — deshalb blieben alle
+  EKL-007-Erwartungen unverändert gültig.
+- **`headline-color` & Co. am `list-item` kennen keine Dark-Mode-Hälfte**:
+  `getColor()` (Kotlin) liest genau einen Schlüssel, ein `dark_headline_color`
+  gibt es nicht, und `resolveColorValue()` versteht nur Palette/Hex, keine
+  Theme-Token. Der Ausweg ist der Helfer **`theme('on-surface-variant')`**:
+  er löst den Wert schon beim Rendern nach `System::isDarkMode()` auf
+  (Fallback „light“, wenn keine Bridge da ist) und liest aus derselben
+  `config/native-ui.php`, die auch die Renderer benutzen.
+- **`disabled` am `list-item` dämpft nicht nur, es sperrt den Tap**
+  (`clickable(enabled = !disabled)`) — für „abgehakt, aber weiter antippbar“
+  also unbrauchbar.
+- **`Http::fake([...])` ist keine Wand gegen echte Anfragen:** was kein Muster
+  trifft, geht wirklich ins Netz. Wer eine zweite Route benutzt, muss sie
+  mit faken — in `mitMealie()` steht die Artikel-Route deshalb *vor*
+  `mealieAntwortet()` (überschneidungsfreie Muster, Reihenfolge egal, aber
+  die Regel „das erste passende gewinnt“ bleibt).
+- **Mealie nimmt beim Artikel-Update die ganze GET-Darstellung entgegen**
+  (Pydantic ignoriert, was das Update-Schema nicht kennt). Deshalb hält
+  `Eintrag::$roh` die Originalnutzlast — „restliche Felder unverändert“ ist
+  damit wörtlich erfüllt, ohne dass die App Mealies Schema nachbauen muss.
+  Für EKL-009 heißt das: der Cache muss `roh` mitspeichern.
+- **Optimistische Änderungen brauchen zwei Wege zurück:** `finished()` mit
+  `ok: false` *und* `failed()`. Die Fachklasse fängt `ConnectionException`
+  selbst ab und meldet `ok: false`, `failed()` bleibt für alles, was den
+  Async-Lauf selbst zerlegt.
+- **Der Leerzustand und der Abschnitt „Abgehakt“ schließen sich nicht aus.**
+  Wer alles abgehakt hat, sieht „Liste ist leer.“ *und* darunter den
+  Abschnitt — sonst käme er an die abgehakten Artikel nie wieder heran.
+  Der Leerzustand gibt sein `flex-1` dafür ab, wenn der Abschnitt da ist.
+- Für EKL-010: das Bulk-Update geht an `PUT /api/households/shopping/items`
+  mit einem Array — `Artikelstatus::setzen()` ist die Vorlage, die
+  Rücknahme-Logik (`mealieAenderungZuruecknehmen`) lässt sich pro Artikel
+  wiederverwenden.
+<!-- chief-timing story="EKL-008" duration_ms=562585 cost=19.720382 in=174 out=688 cache_create=279820 cache_read=9613031 -->

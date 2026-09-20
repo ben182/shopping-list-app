@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Native\Mobile\AsyncTask;
 use Native\Mobile\Testing\Native;
+use Native\Mobile\Testing\TestableComponent;
 
 /*
  * Geprüft wird immer am Screen: unten ein gefakter Secure Storage und ein
@@ -92,11 +93,59 @@ function mealieAntwortetNacheinander(array ...$antworten): void
  * @param  list<array<string, mixed>>  $artikel
  * @param  array<string, string>  $rezepte
  */
-function mitMealie(array $artikel, array $rezepte = []): void
+function mitMealie(array $artikel, array $rezepte = [], int $aenderungsStatus = 200): void
 {
     AsyncTask::fake();
     fakeSecureStore('mealie-geheim-123');
+
+    // Zuerst die Artikel-Route: ein späteres `Http::fake()` legt seine Regel
+    // nur dahinter, und die Muster hier überschneiden sich nicht.
+    Http::fake(['*/api/households/shopping/items/*' => Http::response([], $aenderungsStatus)]);
+
     mealieAntwortet($artikel, $rezepte);
+}
+
+/**
+ * Die Zeilen, die direkt in der Liste stehen statt in einem Abschnitt — der
+ * Block „Abgehakt“ am Ende, samt seiner Überschriftszeile.
+ *
+ * @return list<array<string, mixed>>
+ */
+function abgehaktBlock(TestableComponent $screen): array
+{
+    $liste = null;
+
+    $walk = function (array $node) use (&$walk, &$liste): void {
+        if (($node['type'] ?? null) === 'list') {
+            $liste ??= $node;
+
+            return;
+        }
+
+        foreach ($node['children'] ?? [] as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($screen->tree());
+
+    return array_values(array_filter(
+        $liste['children'] ?? [],
+        fn (array $knoten) => ($knoten['type'] ?? null) === 'list_item',
+    ));
+}
+
+/**
+ * Die Headlines des Blocks „Abgehakt“ in Render-Reihenfolge.
+ *
+ * @return list<string>
+ */
+function abgehaktZeilen(TestableComponent $screen): array
+{
+    return array_map(
+        fn (array $knoten) => $knoten['props']['headline'] ?? '',
+        abgehaktBlock($screen),
+    );
 }
 
 /**
@@ -274,9 +323,12 @@ it('zählt im Untertitel eigene und offene Mealie-Artikel zusammen', function ()
 it('zeigt den Leerzustand erst, wenn weder eigene noch offene Mealie-Artikel da sind', function () {
     mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
 
-    Native::visit('/')
-        ->assertSee('Liste ist leer.')
-        ->assertMissingElement('list_item');
+    $screen = Native::visit('/')->assertSee('Liste ist leer.');
+
+    // Der Artikel steht nur noch im eingeklappten Abschnitt „Abgehakt“ —
+    // sonst käme man nie wieder an ihn heran.
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
+    $screen->assertDontSee('1 Liter Milch');
 });
 
 it('zeigt keinen Leerzustand, solange ein Mealie-Artikel offen ist', function () {
@@ -446,4 +498,149 @@ it('beschriftet die Liste mit Mealie-Zeilen und die Hinweiszeile für Screenread
     fakeSecureStore();
 
     Native::visit('/', platform: 'android')->assertAccessible();
+});
+
+it('nimmt einen angetippten Mealie-Artikel sofort aus seiner Gruppe und hakt ihn in Mealie ab', function () {
+    mitMealie([
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1'),
+        mealieArtikel('2 Zucchini', label: 'Gemüse', id: 'zucchini-1'),
+    ]);
+
+    $screen = Native::visit('/');
+
+    expect(navUntertitel($screen))->toBe('2 Artikel');
+
+    $screen->tap('1 Kopf Brokkoli');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['2 Zucchini']]]);
+    expect(navUntertitel($screen))->toBe('1 Artikel');
+
+    Http::assertSent(fn ($anfrage) => $anfrage->method() === 'PUT'
+        && $anfrage->url() === 'https://mealie.example.test/api/households/shopping/items/brokkoli-1'
+        && $anfrage['checked'] === true
+        // „restliche Felder unverändert“: Mealies eigene Darstellung geht zurück.
+        && $anfrage['display'] === '1 Kopf Brokkoli'
+        && $anfrage['createdAt'] === '2026-09-12T15:37:15.316035Z');
+});
+
+it('sammelt abgehakte Mealie-Artikel eingeklappt am Ende der Liste', function () {
+    mitMealie([
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse'),
+        mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true),
+        mealieArtikel('250 g Butter', label: 'Milchprodukte', abgehakt: true),
+    ]);
+
+    $screen = Native::visit('/');
+
+    // Eingeklappt: nur die Überschrift, keine Zeilen.
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (2)']);
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+});
+
+it('lässt den Abschnitt „Abgehakt“ weg, solange nichts abgehakt ist', function () {
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
+
+    expect(abgehaktZeilen(Native::visit('/')))->toBe([]);
+});
+
+it('klappt den Abschnitt „Abgehakt“ auf und wieder zu', function () {
+    mitMealie([
+        mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true, position: 1),
+        mealieArtikel('250 g Butter', label: 'Milchprodukte', abgehakt: true, position: 0),
+    ]);
+
+    $screen = Native::visit('/', platform: 'android');
+
+    expect(knotenMitRef($screen, 'abgehakt-kopf')['props']['trailing_icon'])->toBe('expand_more');
+
+    $screen->tap('Abgehakt (2)');
+
+    // Ohne Gruppierung und in Mealies Reihenfolge (Position 0 vor Position 1).
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (2)', '250 g Butter', '1 Liter Milch']);
+    expect(knotenMitRef($screen, 'abgehakt-kopf')['props']['trailing_icon'])->toBe('expand_less');
+
+    $screen->tap('Abgehakt (2)');
+
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (2)']);
+});
+
+it('zeichnet eine abgehakte Zeile mit gesetztem Haken und gedämpfter Schrift', function () {
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
+
+    $screen = Native::visit('/')->tap('Abgehakt (1)');
+
+    $zeile = abgehaktBlock($screen)[1]['props'];
+
+    expect($zeile['leading_type'])->toBe('checkbox');
+    expect($zeile['leading_checked'])->toBeTrue();
+    // Der gedämpfte Theme-Wert der hellen Darstellung aus config/native-ui.php.
+    expect($zeile['headline_color'])->toBe('#475569');
+});
+
+it('behält den Auf-/Zu-Zustand des Abschnitts über einen Tab-Wechsel hinweg', function () {
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
+
+    Native::visit('/')->tap('Abgehakt (1)');
+
+    // Ein zweiter Besuch mountet den Screen neu — wie der Wechsel zurück auf
+    // den Einkaufen-Tab.
+    expect(abgehaktZeilen(Native::visit('/')))->toBe(['Abgehakt (1)', '1 Liter Milch']);
+});
+
+it('holt eine angetippte abgehakte Zeile zurück in ihre Gruppe und meldet es Mealie', function () {
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true, id: 'milch-1')]);
+
+    $screen = Native::visit('/')->tap('Abgehakt (1)')->tap('1 Liter Milch');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['1 Liter Milch']]]);
+    expect(abgehaktZeilen($screen))->toBe([]);
+
+    Http::assertSent(fn ($anfrage) => $anfrage->method() === 'PUT'
+        && $anfrage->url() === 'https://mealie.example.test/api/households/shopping/items/milch-1'
+        && $anfrage['checked'] === false);
+});
+
+it('holt einen Artikel zurück und meldet es per Toast, wenn Mealie das Abhaken ablehnt', function () {
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')], aenderungsStatus: 500);
+
+    $screen = Native::visit('/')->tap('1 Kopf Brokkoli');
+
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+    expect(abgehaktZeilen($screen))->toBe([]);
+
+    $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Änderung fehlgeschlagen');
+});
+
+it('hakt einen Artikel wieder ab, wenn das Zurückholen in einen Timeout läuft', function () {
+    AsyncTask::fake();
+    fakeSecureStore('mealie-geheim-123');
+    Http::fake(['*/api/households/shopping/items/*' => fn () => throw new ConnectionException('Zeitüberschreitung')]);
+    mealieAntwortet([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
+
+    $screen = Native::visit('/')->tap('Abgehakt (1)')->tap('1 Liter Milch');
+
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Milch']);
+    expect(listenAbschnitte($screen))->toBe([]);
+
+    $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Änderung fehlgeschlagen');
+});
+
+it('hält eigene Artikel aus dem Abschnitt „Abgehakt“ heraus und schickt sie weiter in den Vorrat', function () {
+    eigeneArtikel('tofu');
+
+    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
+
+    $screen = Native::visit('/')->tap('Abgehakt (1)')->tap('Tofu');
+
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Milch']);
+
+    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
+        ->firstWhere('ueberschrift', 'Kühlregal')['artikel'];
+
+    expect($vorrat)->toContain('Tofu');
 });
