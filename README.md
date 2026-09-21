@@ -295,7 +295,7 @@ Katalog.
 - **Jeder Artikel gehört in genau einen Laden.** Steht er in zweien, trennen die
   Chips nichts mehr und man läuft doch wieder durch die ganze Liste. Die
   Aufteilung folgt dem Einkauf: `lidl` für Grundnahrungsmittel und alles Günstige
-  (97 Artikel), `rewe` für die veganen Spezialprodukte, die Lidl nicht führt (8),
+  (98 Artikel), `rewe` für die veganen Spezialprodukte, die Lidl nicht führt (7),
   `getraenkemarkt` für alles Trinkbare (7). Zwei Tests in
   `tests/Feature/EinkaufenLaedenTest.php` halten die Regel fest — sie fallen um,
   sobald ein Artikel in zwei oder in keinem Laden steht.

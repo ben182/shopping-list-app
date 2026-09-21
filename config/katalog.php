@@ -99,7 +99,7 @@ return [
                 'veganes-schnitzel' => 'Veganes Schnitzel',
                 'veganes-cordon-bleu' => 'Veganes Cordon Bleu',
                 'veganer-streukaese' => 'Veganer Streukäse',
-                'vegane-creme-fraiche' => ['name' => 'Vegane Crème Fraîche', 'laeden' => ['rewe']],
+                'vegane-creme-fraiche' => 'Vegane Crème Fraîche',
                 'vegane-mayonnaise' => 'Vegane Mayonnaise',
                 'hafercreme' => 'Hafercreme',
             ],
