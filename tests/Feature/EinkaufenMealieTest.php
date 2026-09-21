@@ -1438,3 +1438,53 @@ it('verteilt eine abgelegte Mealie-Antwort auf Katalog-, Alias- und eigene Grupp
 
     expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Hafermilch']);
 });
+
+it('erbt für Mealie-Artikel die Läden der Warengruppe, unter der sie stehen', function () {
+    mitMealie([
+        mealieArtikel('1 Liter Hafermilch', label: 'Kühlregal'),
+        mealieArtikel('6 Flaschen Wasser', label: 'Getränke'),
+    ]);
+
+    $screen = Native::visit('/');
+
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['1 Liter Hafermilch']],
+        ['ueberschrift' => 'Getränke', 'artikel' => ['6 Flaschen Wasser']],
+    ]);
+
+    // Mealie kennt keine Läden — die Zeile erbt sie von ihrer Warengruppe:
+    // Kühlregal gibt es in beiden Supermärkten, Getränke nur im Getränkemarkt.
+    expect(listenAbschnitte($screen->toggle('laden-lidl', true)))
+        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['1 Liter Hafermilch']]]);
+
+    expect(listenAbschnitte($screen->toggle('laden-getraenkemarkt', true)))
+        ->toBe([['ueberschrift' => 'Getränke', 'artikel' => ['6 Flaschen Wasser']]]);
+});
+
+it('lässt einen Mealie-Artikel in einer eigenen Gruppe in jedem Filter stehen', function () {
+    mitMealie([
+        mealieArtikel('1 Glas Kimchi', label: 'Asia-Laden'),
+        mealieArtikel('3 Feuerzeuge'),
+    ]);
+
+    // Weder „Asia-Laden“ noch „Sonstiges“ stehen im Katalog — es gibt keine
+    // Läden zu erben, also bleiben beide Zeilen stehen. Ein übersehener
+    // Artikel wiegt schwerer als eine Zeile zu viel.
+    expect(listenAbschnitte(Native::visit('/')->toggle('laden-getraenkemarkt', true)))->toBe([
+        ['ueberschrift' => 'Asia-Laden', 'artikel' => ['1 Glas Kimchi']],
+        ['ueberschrift' => 'Sonstiges', 'artikel' => ['3 Feuerzeuge']],
+    ]);
+});
+
+it('lässt den Block „Abgehakt“ vom Ladenfilter unberührt', function () {
+    mitMealie([
+        mealieArtikel('6 Flaschen Wasser', label: 'Getränke'),
+        mealieArtikel('1 Liter Hafermilch', label: 'Kühlregal', abgehakt: true),
+    ]);
+
+    // Was im Wagen liegt, gehört vollständig in den Block — auch das, was
+    // der gewählte Laden gar nicht führt.
+    $screen = Native::visit('/')->toggle('laden-getraenkemarkt', true)->tap('Abgehakt (1)');
+
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Hafermilch']);
+});

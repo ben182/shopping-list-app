@@ -9,6 +9,8 @@ use App\Einkaufen\Uebersicht;
 use App\Einkaufen\Zeile;
 use App\Icons\Android;
 use App\Icons\Ios;
+use App\Katalog\Laden;
+use App\Katalog\Ladenfilter;
 use App\Liste\EigeneListe;
 use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
@@ -42,13 +44,23 @@ class Einkaufen extends Screen
 
     /**
      * Die Anzahl der offenen Artikel auf diesem Screen — eigene plus die
-     * nicht abgehakten aus Mealie.
+     * nicht abgehakten aus Mealie. Filtert gerade ein Laden, steht daneben,
+     * wie viele es ohne ihn wären: sonst sähe eine halbe Liste aus wie die
+     * ganze.
      */
     public function navSubtitle(): ?string
     {
-        $anzahl = $this->uebersicht()->anzahl();
+        $uebersicht = $this->uebersicht();
+        $anzahl = $uebersicht->anzahl();
+        $gesamt = $uebersicht->gesamtzahl();
 
-        return $anzahl === 0 ? null : $anzahl.' Artikel';
+        if ($gesamt === 0) {
+            return null;
+        }
+
+        return $anzahl === $gesamt
+            ? $gesamt.' Artikel'
+            : $anzahl.' von '.$gesamt.' Artikeln';
     }
 
     /**
@@ -118,10 +130,12 @@ class Einkaufen extends Screen
         $optionen = NavBarOptions::make();
 
         if ($this->uebersicht()->anzahl() > 0) {
+            $laden = $this->gewaehlterLaden();
+
             $optionen->action(
                 NavAction::make('alles-abhaken')
                     ->icon(ios: Ios::CheckmarkCircle, android: Android::DoneAll)
-                    ->a11yLabel('Alles abhaken')
+                    ->a11yLabel($laden === null ? 'Alles abhaken' : 'Alles bei '.$laden->bezeichnung().' abhaken')
                     ->press('alleAbhaken')
             );
         }
@@ -132,6 +146,48 @@ class Einkaufen extends Screen
                 ->a11yLabel('Einstellungen')
                 ->press('oeffneEinstellungen')
         );
+    }
+
+    /**
+     * Die Läden, die als Chips über der Liste stehen — in der Reihenfolge des
+     * Enums, „Alle“ setzt die View davor.
+     *
+     * @return list<Laden>
+     */
+    public function laeden(): array
+    {
+        return Laden::alle();
+    }
+
+    /**
+     * Wie viele Artikel offen wären, stünde der Filter auf „Alle“. Die View
+     * entscheidet daran, ob die Chips überhaupt etwas zu filtern haben.
+     */
+    public function gesamtzahl(): int
+    {
+        return $this->uebersicht()->gesamtzahl();
+    }
+
+    /** Welcher Chip aktiv ist — `null` heißt „Alle“. */
+    public function gewaehlterLaden(): ?Laden
+    {
+        return app(Ladenfilter::class)->laden();
+    }
+
+    /**
+     * Ein Tap auf einen Chip. Der Chip „Alle“ schickt einen leeren
+     * Schlüssel; ein zweiter Tap auf den aktiven Chip führt zurück auf
+     * „Alle“, damit man nicht erst zurückzielen muss.
+     */
+    public function ladenWaehlen(string $schluessel): void
+    {
+        $this->leisteVerwerfen();
+
+        $filter = app(Ladenfilter::class);
+
+        $filter->setzen($filter->laden()?->value === $schluessel ? '' : $schluessel);
+
+        $this->listeNeuZeichnen();
     }
 
     /**
@@ -249,14 +305,24 @@ class Einkaufen extends Screen
      */
     public function alleAbhaken(): void
     {
-        $eigeneIds = $this->liste()->artikelIds();
+        $eigeneIds = $this->uebersicht()->eigeneIds();
         $mealie = $this->mealieZumAbhaken();
 
         if ($eigeneIds === [] && $mealie === []) {
             return;
         }
 
-        $this->liste()->alleEntfernen();
+        // Ohne Filter räumt `alleEntfernen()` die Tabelle leer und wird dabei
+        // auch die IDs los, die der Katalog nicht mehr kennt. Mit Filter darf
+        // nur weg, was gerade dasteht — sonst hakt ein Tap Artikel ab, die
+        // der Screen gar nicht zeigt.
+        if ($this->gewaehlterLaden() === null) {
+            $this->liste()->alleEntfernen();
+        } else {
+            foreach ($eigeneIds as $artikelId) {
+                $this->liste()->entfernen($artikelId);
+            }
+        }
 
         $vorgang = new Abhakvorgang($eigeneIds, array_map(fn (Eintrag $eintrag) => $eintrag->roh, $mealie));
 
@@ -298,9 +364,10 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Die offenen Mealie-Artikel, die „Alles abhaken“ mitnimmt. Leer, solange
-     * das Banner steht oder kein Token hinterlegt ist: dann kann die App
-     * Mealie nichts melden und zählt es in der Leiste auch nicht mit.
+     * Die offenen Mealie-Artikel, die „Alles abhaken“ mitnimmt — die, die
+     * gerade dastehen. Leer, solange das Banner steht oder kein Token
+     * hinterlegt ist: dann kann die App Mealie nichts melden und zählt es in
+     * der Leiste auch nicht mit.
      *
      * @return list<Eintrag>
      */
@@ -310,7 +377,7 @@ class Einkaufen extends Screen
             return [];
         }
 
-        return app(Sitzung::class)->offene();
+        return $this->uebersicht()->offeneMealieArtikel();
     }
 
     /**

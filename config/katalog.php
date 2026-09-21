@@ -17,6 +17,19 @@ declare(strict_types=1);
 | möglich bleibt. Der Katalog ist in der App nicht editierbar — Änderungen
 | hier brauchen ein App-Update.
 |
+| `laeden` an einer Gruppe sagt, wo es die Sachen dieser Gruppe gibt; jeder
+| Artikel erbt das. Wo ein einzelner Artikel davon abweicht, steht statt des
+| Anzeigenamens ein Array:
+|
+|     'tofu'  => 'Tofu',                                       // erbt die Gruppe
+|     'tempeh' => ['name' => 'Tempeh', 'laeden' => ['rewe']],  // nur dort
+|
+| Erlaubte Schlüssel: `lidl`, `rewe`, `getraenkemarkt` (siehe
+| App\Katalog\Laden). Ein Artikel darf in mehreren Läden stehen — der Filter
+| auf dem Einkaufen-Screen fragt „bekomme ich das hier?“. Ein Artikel ohne
+| jeden Laden steht in jedem Filter: lieber eine Zeile zu viel als eine
+| vergessene.
+|
 */
 
 return [
@@ -25,6 +38,7 @@ return [
 
         'obst-gemuese' => [
             'name' => 'Obst & Gemüse',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'aepfel' => 'Äpfel',
                 'bananen' => 'Bananen',
@@ -48,6 +62,7 @@ return [
 
         'brot' => [
             'name' => 'Brot & Backwaren',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'brot' => 'Brot',
                 'broetchen' => 'Brötchen',
@@ -59,6 +74,7 @@ return [
 
         'kuehlregal' => [
             'name' => 'Kühlregal',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'hafermilch' => 'Hafermilch',
                 'sojamilch' => 'Sojamilch',
@@ -68,22 +84,22 @@ return [
                 'margarine' => 'Margarine',
                 'veganer-kaese' => 'Veganer Käse',
                 'veganer-frischkaese' => 'Veganer Frischkäse',
-                'tofu' => 'Tofu',
-                'raeuchertofu' => 'Räuchertofu',
-                'tempeh' => 'Tempeh',
-                'seitan' => 'Seitan',
+                'tofu' => ['name' => 'Tofu', 'laeden' => ['rewe']],
+                'raeuchertofu' => ['name' => 'Räuchertofu', 'laeden' => ['rewe']],
+                'tempeh' => ['name' => 'Tempeh', 'laeden' => ['rewe']],
+                'seitan' => ['name' => 'Seitan', 'laeden' => ['rewe']],
                 'hummus' => 'Hummus',
-                'zaziki' => 'Zaziki',
+                'zaziki' => ['name' => 'Zaziki', 'laeden' => ['rewe']],
                 'vegane-wurst' => 'Vegane Wurst',
                 'vegane-bratwurst' => 'Vegane Bratwurst',
                 'vegane-leberwurst' => 'Vegane Leberwurst',
                 'veganer-fleischsalat' => 'Veganer Fleischsalat',
                 'veganer-aufstrich' => 'Veganer Aufstrich',
-                'vivera-schnitzel' => 'Vivera Schnitzel',
+                'vivera-schnitzel' => ['name' => 'Vivera Schnitzel', 'laeden' => ['rewe']],
                 'veganes-schnitzel' => 'Veganes Schnitzel',
                 'veganes-cordon-bleu' => 'Veganes Cordon Bleu',
                 'veganer-streukaese' => 'Veganer Streukäse',
-                'vegane-creme-fraiche' => 'Vegane Crème Fraîche',
+                'vegane-creme-fraiche' => ['name' => 'Vegane Crème Fraîche', 'laeden' => ['rewe']],
                 'vegane-mayonnaise' => 'Vegane Mayonnaise',
                 'hafercreme' => 'Hafercreme',
             ],
@@ -91,6 +107,7 @@ return [
 
         'tiefkuehl' => [
             'name' => 'Tiefkühl',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'vegane-pizza' => 'Vegane Pizza',
                 'pommes' => 'Pommes',
@@ -104,6 +121,7 @@ return [
 
         'lebensmittel' => [
             'name' => 'Lebensmittel',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'nudeln' => 'Nudeln',
                 'reis' => 'Reis',
@@ -124,7 +142,7 @@ return [
                 'olivenoel' => 'Olivenöl',
                 'essig' => 'Essig',
                 'sojasauce' => 'Sojasauce',
-                'suess-sauer-sauce' => 'Süß-Sauer-Sauce',
+                'suess-sauer-sauce' => ['name' => 'Süß-Sauer-Sauce', 'laeden' => ['rewe']],
                 'barbecue-sauce' => 'Barbecue-Sauce',
                 'hefeflocken' => 'Hefeflocken',
                 'haferflocken' => 'Haferflocken',
@@ -145,6 +163,7 @@ return [
 
         'getraenke' => [
             'name' => 'Getränke',
+            'laeden' => ['getraenkemarkt'],
             'artikel' => [
                 'wasser-still' => 'Wasser (still)',
                 'wasser-sprudel' => 'Wasser (Sprudel)',
@@ -158,6 +177,7 @@ return [
 
         'haushalt' => [
             'name' => 'Haushalt',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'spuelmittel' => 'Spülmittel',
                 'waschmittel' => 'Waschmittel',
@@ -172,6 +192,7 @@ return [
 
         'drogerie' => [
             'name' => 'Drogerie',
+            'laeden' => ['lidl'],
             'artikel' => [
                 'zahnpasta' => 'Zahnpasta',
                 'duschgel' => 'Duschgel',

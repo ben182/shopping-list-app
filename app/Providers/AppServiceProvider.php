@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Einkaufen\Rueckgaengig;
+use App\Katalog\Ladenfilter;
 use App\Mealie\Sitzung;
 use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Illuminate\Support\ServiceProvider;
@@ -27,5 +28,9 @@ class AppServiceProvider extends ServiceProvider
         // gehören, nicht einem Aufruf — das Ergebnis des Bulk-Updates kommt
         // erst nach dem Rendern zurück und greift dann noch auf sie zu.
         $this->app->singleton(Rueckgaengig::class);
+
+        // Und für den Ladenfilter, den Einkaufen und Vorrat sich teilen: wer
+        // im Laden steht, soll seine Wahl nicht auf jedem Screen neu treffen.
+        $this->app->singleton(Ladenfilter::class);
     }
 }

@@ -2,6 +2,7 @@
 @use('App\Icons\Ios')
 
 @php($banner = $this->banner())
+@php($gewaehlterLaden = $this->gewaehlterLaden())
 
 <native:column class="w-full h-full bg-theme-background">
     {{-- Direkt unter der Top-Bar: die Einladung, Mealie zu verbinden, das
@@ -53,7 +54,23 @@
         </native:row>
     @endif
 
-    @if ($this->abschnitte === [])
+    {{-- Der Ladenfilter — nur, wenn es etwas zu filtern gibt; über einer
+         leeren Liste wäre er Zierde. --}}
+    @if ($this->gesamtzahl() > 0)
+        @include('native.laden-filter', ['laeden' => $this->laeden(), 'gewaehlterLaden' => $gewaehlterLaden])
+    @endif
+
+    @if ($this->abschnitte === [] && $gewaehlterLaden !== null && $this->gesamtzahl() > 0)
+        {{-- Nichts für diesen Laden, aber sehr wohl etwas auf der Liste: der
+             Weg zurück steht in den Chips darüber, der Text zeigt darauf. --}}
+        <native:column class="w-full flex-1 items-center justify-center gap-3 px-8">
+            <native:icon :ios="Ios::Cart" :android="Android::ShoppingCart" :size="48" class="text-theme-on-surface-variant" />
+            <native:text class="text-center text-base text-theme-on-surface">Nichts für {{ $gewaehlterLaden->bezeichnung() }} auf der Liste.</native:text>
+            <native:text class="text-center text-sm text-theme-on-surface-variant">
+                Tippe oben auf „Alle“, um die ganze Liste zu sehen.
+            </native:text>
+        </native:column>
+    @elseif ($this->abschnitte === [])
         {{-- Füllt den Platz zwischen Banner und dem angepinnten Block
              „Abgehakt“ — der sitzt unten und nimmt ihn nicht mehr ein. --}}
         <native:column class="w-full flex-1 items-center justify-center gap-3 px-8">

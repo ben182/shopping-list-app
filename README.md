@@ -256,6 +256,7 @@ Der feste Artikelkatalog — 8 Gruppen, 112 Artikel — steht in `config/katalog
 'gruppen' => [
     'obst-gemuese' => [
         'name' => 'Obst & Gemüse',
+        'laeden' => ['lidl', 'rewe'],
         'artikel' => [
             'aepfel'  => 'Äpfel',
             'bananen' => 'Bananen',
@@ -277,7 +278,50 @@ Der feste Artikelkatalog — 8 Gruppen, 112 Artikel — steht in `config/katalog
   dort ebenfalls — ohne Fehler.
 
 Gelesen wird der Katalog nie direkt, sondern über `App\Katalog\Katalog`
-(`gruppen()`, `artikelIds()`, `kennt()`, `gruppiert()`).
+(`gruppen()`, `artikelIds()`, `kennt()`, `gruppiert()`, `imLaden()`).
+
+### Läden (`laeden`)
+
+Über Einkaufsliste **und** Vorrat stehen dieselben Filter-Chips: **Alle · Lidl ·
+Rewe · Getränkemarkt**. Woher die App weiß, was es wo gibt, steht ebenfalls im
+Katalog.
+
+- **Pro Gruppe:** `'laeden' => ['lidl', 'rewe']`. Jeder Artikel der Gruppe erbt das.
+- **Pro Artikel:** wo einer abweicht, steht statt des Anzeigenamens ein Array —
+  `'tempeh' => ['name' => 'Tempeh', 'laeden' => ['rewe']]`. Beide Schreibweisen
+  dürfen in derselben Gruppe stehen.
+- **Erlaubte Schlüssel:** `lidl`, `rewe`, `getraenkemarkt` (`App\Katalog\Laden`).
+  Ein unbekannter Schlüssel fällt still weg.
+- **Jeder Artikel gehört in genau einen Laden.** Steht er in zweien, trennen die
+  Chips nichts mehr und man läuft doch wieder durch die ganze Liste. Die
+  Aufteilung folgt dem Einkauf: `lidl` für Grundnahrungsmittel und alles Günstige
+  (97 Artikel), `rewe` für die veganen Spezialprodukte, die Lidl nicht führt (8),
+  `getraenkemarkt` für alles Trinkbare (7). Zwei Tests in
+  `tests/Feature/EinkaufenLaedenTest.php` halten die Regel fest — sie fallen um,
+  sobald ein Artikel in zwei oder in keinem Laden steht.
+- **Mehrere Läden je Artikel sind technisch weiterhin möglich.** Wer bewusst
+  abweicht, passt den Test mit an.
+- **Ohne `laeden` stünde ein Artikel in jedem Filter.** Dasselbe gilt für
+  Mealie-Artikel unter einer Überschrift, die es im Katalog nicht gibt: sie erben
+  nichts und bleiben deshalb überall stehen — ein übersehener Artikel wiegt
+  schwerer als eine Zeile zu viel.
+
+Der gewählte Laden gilt für die ganze Sitzung (`App\Katalog\Ladenfilter`, ein
+Singleton) und übersteht Tab-Wechsel, nicht aber den App-Start. **Einkaufen und
+Vorrat teilen sich die Wahl** — „ich bin bei Lidl“ ist ein Zustand der Sitzung,
+kein Zustand eines Screens.
+
+- **Einkaufen:** „Alles abhaken“ nimmt nur mit, was gerade dasteht, und der
+  Untertitel nennt beide Zahlen („5 von 12 Artikeln“). Der Block „Abgehakt“
+  bleibt ungefiltert.
+- **Vorrat:** Laden und Suche greifen zusammen (UND). Bleibt bei gesetztem
+  Suchbegriff nichts übrig, sagt der Leerzustand dazu, dass ein Laden filtert —
+  sonst sucht man einen Artikel, den der Chip gerade wegblendet.
+
+Das Markup der Chips steht einmal in `resources/views/native/laden-filter.blade.php`
+und wird von beiden Screens per `@include` eingebunden. Ein Include läuft nicht im
+Kontext der Komponente: `$laeden` und `$gewaehlterLaden` gehen als Parameter rein,
+den Handler `ladenWaehlen()` muss der einbindende Screen mitbringen.
 
 > **Katalogänderungen brauchen ein App-Update.** Der Katalog ist eine
 > Konfigurationsdatei und wird beim Bauen in die APK gepackt. Es gibt bewusst keine
@@ -388,14 +432,14 @@ Gerät, einen Emulator oder eine erreichbare Mealie-Instanz.
 app/
 ├── NativeComponents/   Screens: Einkaufen, Vorrat, Wochenplan, Einstellungen
 ├── Layouts/            TabsLayout (Root-Screens), StackLayout (gepushte Screens)
-├── Katalog/            Katalog, Gruppe, Artikel — Zugriff auf config/katalog.php
+├── Katalog/            Katalog, Gruppe, Artikel, Laden, Ladenfilter — config/katalog.php
 ├── Liste/              EigeneListe — der lokale Listen-Zustand in SQLite
 ├── Einkaufen/          Zusammenführung eigener und Mealie-Artikel
 ├── Mealie/             Token, Verbindung, Einkaufsliste, Sitzung, Cache, Fehler
 ├── Wochenplan/         Wochenberechnung und Mealplan-Sitzung
 └── Icons/              generierte Icon-Enums (php artisan native-ui:generate-icons)
 
-config/katalog.php      Artikelkatalog (8 Gruppen, 112 Artikel)
+config/katalog.php      Artikelkatalog (8 Gruppen, 112 Artikel) samt Laden-Zuordnung
 config/mealie.php       Mealie-URL, Listen-ID, Timeout, Label-Aliase
 config/nativephp.php    App-ID, SDK-Versionen, Theme, cleanup_env_keys, Hot-Reload
 routes/mobile.php       Screen-Routen (wird vom Package-Provider geladen, nicht in bootstrap/app.php)
