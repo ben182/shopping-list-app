@@ -4,9 +4,12 @@ namespace App\NativeComponents;
 
 use App\Erscheinungsbild\Auswahl;
 use App\Erscheinungsbild\Farbwahl;
+use App\Icons\Android;
+use App\Icons\Ios;
 use Ben182\AppLifecycle\Events\AppForegrounded;
 use Native\Mobile\Attributes\On;
 use Native\Mobile\Edge\NativeComponent;
+use Native\Mobile\Icon\IconResolver;
 
 /**
  * Gemeinsamer Unterbau aller Screens: er sorgt dafür, dass die App im
@@ -45,5 +48,15 @@ abstract class Screen extends NativeComponent
     protected function wiederImVordergrund(): void
     {
         //
+    }
+
+    /**
+     * `leading-icon` und `icon` nehmen in Blade nur einen einzelnen Namen,
+     * keine `ios:`/`android:`-Paare wie `native:icon`. Die Auswahl muss
+     * deshalb hier passieren; ohne bekannte Plattform (Tests) gilt Android.
+     */
+    protected function iconName(Ios $ios, Android $android): string
+    {
+        return IconResolver::resolve(null, $ios, $android)['icon'] ?? $android->value;
     }
 }

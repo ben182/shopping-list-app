@@ -77,7 +77,7 @@
             <native:icon :ios="Ios::Cart" :android="Android::ShoppingCart" :size="48" class="text-theme-on-surface-variant" />
             <native:text class="text-center text-base text-theme-on-surface">Liste ist leer.</native:text>
             <native:text class="text-center text-sm text-theme-on-surface-variant">
-                Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.
+                Tippe oben auf „+“ oder auf den Vorrat-Tab, um Artikel hinzuzufügen.
             </native:text>
         </native:column>
     @endif
@@ -225,6 +225,24 @@
                         />
                     @endforeach
                 </native:list>
+
+                {{-- Der Weg, die Liste nach dem Einkauf leer zu bekommen.
+                     Er steht unter den Zeilen und nicht im Kopf: der Kopf
+                     klappt um, und ein zweites Ziel daneben trifft man im
+                     Vorbeigehen falsch. Die Liste darüber ist gedeckelt und
+                     scrollt in sich — der Knopf bleibt also stehen, auch
+                     wenn zwanzig Zeilen darüber liegen. --}}
+                <native:row class="w-full items-center justify-center px-4 py-2">
+                    <native:button
+                        ref="abgehakt-loeschen"
+                        size="sm"
+                        variant="ghost"
+                        icon="{{ $papierkorbIcon }}"
+                        label="{{ count($this->abgehakte) === 1 ? 'Artikel löschen' : count($this->abgehakte).' Artikel löschen' }}"
+                        :disabled="$banner !== null"
+                        @press="abgehakteLoeschenBestaetigen"
+                    />
+                </native:row>
             @endif
         </native:column>
     @endif

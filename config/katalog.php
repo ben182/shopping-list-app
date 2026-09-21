@@ -20,9 +20,9 @@ declare(strict_types=1);
 | `laeden` sagt, wo es die Sachen dieser Gruppe gibt. Jeder Artikel erbt das,
 | solange an ihm selbst nichts anderes steht — die Ausnahme trägt er als
 | `extras.laeden` aus Mealie mit (siehe App\Katalog\Ladenzuordnung). Erlaubte
-| Schlüssel: `lidl`, `rewe`, `getraenkemarkt` (siehe App\Katalog\Laden). Eine
-| Gruppe ganz ohne Laden steht in jedem Filter: lieber eine Zeile zu viel als
-| eine vergessene.
+| Schlüssel: `lidl`, `rewe`, `getraenkemarkt`, `dm`, `rossmann`, `budni`
+| (siehe App\Katalog\Laden). Eine Gruppe ganz ohne Laden steht in jedem
+| Filter: lieber eine Zeile zu viel als eine vergessene.
 |
 */
 
@@ -67,7 +67,7 @@ return [
 
         'drogerie' => [
             'name' => 'Drogerie',
-            'laeden' => ['lidl'],
+            'laeden' => ['lidl', 'dm', 'rossmann', 'budni'],
         ],
 
     ],

@@ -67,6 +67,9 @@ it('setzt über die Liste einen Chip je Laden, „Alle“ zuerst und aktiv', fun
         ['label' => 'Lidl', 'aktiv' => false],
         ['label' => 'Rewe', 'aktiv' => false],
         ['label' => 'Getränkemarkt', 'aktiv' => false],
+        ['label' => 'dm', 'aktiv' => false],
+        ['label' => 'Rossmann', 'aktiv' => false],
+        ['label' => 'Budni', 'aktiv' => false],
     ]);
 });
 
@@ -90,6 +93,9 @@ it('zeigt nach einem Tap auf einen Chip nur noch, was es in diesem Laden gibt', 
         ['label' => 'Lidl', 'aktiv' => true],
         ['label' => 'Rewe', 'aktiv' => false],
         ['label' => 'Getränkemarkt', 'aktiv' => false],
+        ['label' => 'dm', 'aktiv' => false],
+        ['label' => 'Rossmann', 'aktiv' => false],
+        ['label' => 'Budni', 'aktiv' => false],
     ]);
 });
 
@@ -173,7 +179,7 @@ it('zeigt einen eigenen Leerzustand, wenn im gewählten Laden nichts ansteht', f
 
     // Der Weg zurück muss stehen bleiben, sonst führt der Filter in die
     // Sackgasse.
-    expect(ladenChips($screen))->toHaveCount(4);
+    expect(ladenChips($screen))->toHaveCount(7);
 });
 
 it('behält den gewählten Laden über einen Tab-Wechsel hinweg', function () {
@@ -280,6 +286,9 @@ it('setzt dieselben Chips auch über den Vorrat', function () {
         ['label' => 'Lidl', 'aktiv' => false],
         ['label' => 'Rewe', 'aktiv' => false],
         ['label' => 'Getränkemarkt', 'aktiv' => false],
+        ['label' => 'dm', 'aktiv' => false],
+        ['label' => 'Rossmann', 'aktiv' => false],
+        ['label' => 'Budni', 'aktiv' => false],
     ]);
 });
 
@@ -367,7 +376,7 @@ it('zeigt im Vorrat einen eigenen Leerzustand, wenn für den Laden alles auf der
         ->assertSee('Tippe oben auf „Alle“, um den ganzen Vorrat zu sehen.')
         ->assertDontSee('Alles auf der Liste.');
 
-    expect(ladenChips($screen))->toHaveCount(4);
+    expect(ladenChips($screen))->toHaveCount(7);
 });
 
 it('lässt die Chips im Vorrat weg, wenn der ganze Vorrat auf der Liste steht', function () {
@@ -389,11 +398,11 @@ it('lässt die Chips im Vorrat weg, wenn der ganze Vorrat auf der Liste steht', 
  * zu „Lidl und Rewe“ zurück, und die Chips filtern nichts mehr.
  */
 
-it('ordnet jede Warengruppe genau einem Laden zu', function () {
+it('nennt zu jeder Warengruppe Läden, aber nie alle', function () {
     $mehrdeutig = [];
 
     foreach (app(Katalog::class)->gruppen() as $gruppe) {
-        if (count($gruppe->laeden) !== 1) {
+        if ($gruppe->laeden === [] || count($gruppe->laeden) === count(Laden::alle())) {
             $mehrdeutig[$gruppe->id] = array_map(fn (Laden $laden) => $laden->value, $gruppe->laeden);
         }
     }
@@ -401,7 +410,7 @@ it('ordnet jede Warengruppe genau einem Laden zu', function () {
     expect($mehrdeutig)->toBe([]);
 });
 
-it('deckt mit den drei Läden zusammen alle Warengruppen ab', function () {
+it('deckt mit allen Läden zusammen jede Warengruppe ab', function () {
     $gruppen = app(Katalog::class)->gruppen();
 
     $abgedeckt = array_values(array_unique(array_merge(...array_map(

@@ -11,6 +11,7 @@ use App\Icons\Android;
 use App\Icons\Ios;
 use App\Katalog\Laden;
 use App\Katalog\Ladenfilter;
+use App\Mealie\Artikelloeschung;
 use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
 use App\Mealie\Eintrag;
@@ -22,6 +23,7 @@ use Native\Mobile\Attributes\Computed;
 use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\Layouts\Builders\NavAction;
 use Native\Mobile\Edge\Layouts\Builders\NavBarOptions;
+use Native\Mobile\Events\Alert\ButtonPressed;
 use Native\Mobile\Facades\Dialog;
 use Native\Mobile\SecureStorageStatus;
 
@@ -118,13 +120,18 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Rechts in der Top-Bar: „Alles abhaken“, solange irgendetwas offen ist,
-     * und das Zahnrad — der einzige Weg zu den Einstellungen, der von überall
-     * erreichbar ist.
+     * Rechts in der Top-Bar: das Plus für einen Artikel von Hand, „Alles
+     * abhaken“, solange irgendetwas offen ist, und das Zahnrad — der einzige
+     * Weg zu den Einstellungen, der von überall erreichbar ist.
      */
     public function navigationOptions(): ?NavBarOptions
     {
-        $optionen = NavBarOptions::make();
+        $optionen = NavBarOptions::make()->action(
+            NavAction::make('artikel-hinzufuegen')
+                ->icon(ios: Ios::Plus, android: Android::Add)
+                ->a11yLabel('Artikel hinzufügen')
+                ->press('oeffneHinzufuegen')
+        );
 
         if ($this->uebersicht()->anzahl() > 0) {
             $laden = $this->gewaehlterLaden();
@@ -234,6 +241,43 @@ class Einkaufen extends Screen
     }
 
     /**
+     * Der Papierkorb im Block „Abgehakt“: nach dem Einkauf fliegt raus, was
+     * im Wagen lag. Hier wird gefragt, anders als beim Abhaken — gelöscht
+     * ist gelöscht, dafür gibt es in Mealie kein Zurück.
+     */
+    public function abgehakteLoeschenBestaetigen(): void
+    {
+        $this->leisteVerwerfen();
+
+        $anzahl = count($this->abgehakte);
+
+        if ($anzahl === 0) {
+            return;
+        }
+
+        if ($this->banner() !== null || $this->mealieToken() === null) {
+            Dialog::toast('Offline: Abgehakte Artikel können gerade nicht gelöscht werden');
+
+            return;
+        }
+
+        Dialog::alert(
+            $anzahl === 1 ? 'Artikel löschen?' : $anzahl.' Artikel löschen?',
+            'Sie verschwinden endgültig aus der Mealie-Einkaufsliste.',
+            [
+                ['label' => 'Abbrechen', 'style' => 'cancel'],
+                ['label' => 'Löschen', 'style' => 'destructive'],
+            ]
+        )->buttonPressed(function (ButtonPressed $ereignis): void {
+            if ($ereignis->label !== 'Löschen') {
+                return;
+            }
+
+            $this->abgehakteLoeschen();
+        });
+    }
+
+    /**
      * Ein Tap auf eine Mealie-Zeile — abhaken, wenn sie offen war, sonst
      * zurückholen. Die Liste springt sofort, Mealie erfährt es nebenher;
      * widerspricht Mealie, springt sie zurück.
@@ -331,6 +375,55 @@ class Einkaufen extends Screen
     public function leisteSchliessen(): void
     {
         $this->leisteVerwerfen();
+    }
+
+    /**
+     * Löscht die abgehakten Artikel — erst auf dem Screen, dann in einem
+     * einzigen Aufruf in Mealie. Lehnt Mealie ab, stehen sie wieder da.
+     */
+    private function abgehakteLoeschen(): void
+    {
+        $token = $this->mealieToken();
+        $ids = array_map(fn (Eintrag $eintrag) => $eintrag->id, app(Sitzung::class)->abgehakte());
+
+        if ($ids === [] || $token === null) {
+            return;
+        }
+
+        $geloescht = app(Sitzung::class)->entfernenMehrere($ids);
+
+        $this->listeNeuZeichnen();
+
+        $basisUrl = (string) config('mealie.url');
+        $timeout = (int) config('mealie.timeout');
+
+        $this->async(static fn (): array => Artikelloeschung::alleLoeschen($basisUrl, $token, $timeout, $ids))
+            ->timeout($timeout + 5)
+            ->finished(function (array $ergebnis) use ($geloescht): void {
+                if ($ergebnis['ok'] ?? false) {
+                    return;
+                }
+
+                $this->loeschenZuruecknehmen($geloescht);
+            })
+            ->failed(function () use ($geloescht): void {
+                $this->loeschenZuruecknehmen($geloescht);
+            });
+    }
+
+    /**
+     * Mealie hat das Löschen nicht angenommen: die Artikel kehren in den
+     * Block „Abgehakt“ zurück.
+     *
+     * @param  list<array<string, mixed>>  $geloescht
+     */
+    private function loeschenZuruecknehmen(array $geloescht): void
+    {
+        app(Sitzung::class)->einfuegenMehrere($geloescht);
+
+        $this->listeNeuZeichnen();
+
+        Dialog::toast('Mealie: Löschen fehlgeschlagen');
     }
 
     /**
@@ -462,9 +555,19 @@ class Einkaufen extends Screen
         $this->navigate('/einstellungen');
     }
 
+    /** Das Plus in der Top-Bar — der Weg zum Artikel von Hand. */
+    public function oeffneHinzufuegen(): void
+    {
+        $this->leisteVerwerfen();
+
+        $this->navigate('/artikel-hinzufuegen');
+    }
+
     public function render(): Element
     {
-        return $this->view('einkaufen');
+        return $this->view('einkaufen', [
+            'papierkorbIcon' => $this->iconName(Ios::Trash, Android::DeleteOutline),
+        ]);
     }
 
     /**

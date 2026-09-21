@@ -1,25 +1,27 @@
 <?php
 
-namespace App\Vorrat;
+namespace App\Mealie;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Kopiert einen Vorratsartikel auf die Einkaufsliste.
+ * Legt einen Artikel auf der Mealie-Einkaufsliste an.
  *
- * Kopiert, nicht verschoben: der Vorratseintrag bleibt stehen, er ist der
- * Katalog. Mitgenommen wird, was den Artikel im Laden ausmacht — das
- * Lebensmittel oder die Notiz, seine Warengruppe und die Läden, falls an ihm
- * eine Ausnahme steht.
+ * Beide Wege dorthin laufen hier durch: der Tap im Vorrat, der einen
+ * Vorratsartikel kopiert — kopiert, nicht verschoben, der Vorratseintrag
+ * bleibt stehen —, und der von Hand getippte Artikel. Was mitgeht, ist in
+ * beiden Fällen dasselbe: das Lebensmittel oder die Notiz, die Warengruppe
+ * und die Läden, falls an dem Artikel eine Ausnahme steht.
  *
  * Wie App\Mealie\Einkaufsliste statisch und abhängigkeitsfrei: der Aufruf
  * läuft über `AsyncTask` in einem eigenen Interpreter.
  */
-final class Hinzufuegen
+final class Artikelanlage
 {
     /**
-     * @param  array<string, mixed>  $vorlage  Mealies Darstellung des Vorratsartikels
+     * @param  array<string, mixed>  $vorlage  Mealies Darstellung des Artikels —
+     *                                          aus dem Vorrat oder von Hand gebaut
      * @return array{ok: bool, artikel?: array<string, mixed>}
      */
     public static function ausfuehren(string $basisUrl, string $token, int $timeout, string $listenId, array $vorlage): array
@@ -81,7 +83,7 @@ final class Hinzufuegen
             $nutzlast['note'] = trim((string) ($vorlage['note'] ?? $vorlage['display'] ?? ''));
         }
 
-        // Von den Extras des Vorrats geht nur die Ladenausnahme mit; der
+        // Von den Extras der Vorlage geht nur die Ladenausnahme mit; der
         // Rest ist Buchhaltung der Vorratsliste und hat im Einkauf nichts
         // verloren.
         $extras = is_array($vorlage['extras'] ?? null) ? $vorlage['extras'] : [];

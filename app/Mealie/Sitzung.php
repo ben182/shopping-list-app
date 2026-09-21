@@ -151,6 +151,49 @@ final class Sitzung
         $this->cache->aktualisieren($this->daten());
     }
 
+    /**
+     * Nimmt mehrere Artikel in einem Zug heraus — das Löschen der abgehakten
+     * Zeilen. Zurück kommen sie in ihrer flachen Form: nimmt Mealie das
+     * Löschen nicht an, stellt {@see einfuegenMehrere()} sie damit wieder her.
+     *
+     * @param  list<string>  $ids
+     * @return list<array<string, mixed>>
+     */
+    public function entfernenMehrere(array $ids): array
+    {
+        $betroffen = array_flip($ids);
+        $entfernt = [];
+        $bleiben = [];
+
+        foreach ($this->alle() as $eintrag) {
+            if (isset($betroffen[$eintrag->id])) {
+                $entfernt[] = $eintrag->daten();
+            } else {
+                $bleiben[] = $eintrag;
+            }
+        }
+
+        $this->eintraege = $bleiben;
+
+        $this->cache->aktualisieren($this->daten());
+
+        return $entfernt;
+    }
+
+    /**
+     * Hängt mehrere Artikel wieder an die Liste — die Rücknahme eines
+     * gescheiterten Löschens. Sie stehen danach am Ende; ihre Stelle in
+     * Mealies Reihenfolge bringt der nächste Ladevorgang zurück.
+     *
+     * @param  list<array<string, mixed>>  $daten
+     */
+    public function einfuegenMehrere(array $daten): void
+    {
+        $this->eintraege = [...$this->alle(), ...array_map(Eintrag::ausDaten(...), $daten)];
+
+        $this->cache->aktualisieren($this->daten());
+    }
+
     public function abgehakteAufgeklappt(): bool
     {
         return $this->abgehakteAufgeklappt;

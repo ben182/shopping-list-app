@@ -275,6 +275,31 @@ statt eine zweite für dasselbe anzulegen.
 Erkannt wird „derselbe Artikel“ am Mealie-Lebensmittel, und wo es keines gibt, am
 Namen.
 
+### Artikel von Hand
+
+Was weder aus einem Rezept kommt noch im Vorrat steht — Wattepads, Blumenerde,
+Geschenkpapier —, geht über das **Plus in der Top-Bar** des Einkaufen-Screens
+(`App\NativeComponents\ArtikelHinzufuegen`, Route `/artikel-hinzufuegen`).
+
+- **Name, Warengruppe, Läden.** Die Warengruppen-Chips sind die Gruppen aus
+  `config/katalog.php`, für die Mealie ein Label kennt (`GET /api/groups/labels`,
+  zugeordnet in `App\Einkaufen\Gruppenwahl` — Namensgleichheit zuerst, sonst über
+  die Alias-Tabelle). Ohne Wahl landet der Artikel unter „Sonstiges“.
+- **Die Läden sind mehrfach wählbar** und gehen als `extras.laeden` an die Zeile;
+  ohne Wahl steht der Artikel in jedem Filter.
+- **Angelegt wird in Mealie**, ohne Lebensmittel: der Text steht in der Notiz,
+  genau wie bei einer von Hand getippten Zeile in Mealie selbst. Der Screen
+  wartet auf die Antwort und geht erst dann zurück — scheitert sie, bleibt das
+  Getippte im Feld stehen.
+
+### Abgehakte löschen
+
+Im Block „Abgehakt“ steht aufgeklappt ein **„… Artikel löschen“**. Nach einer
+Rückfrage gehen alle abgehakten Zeilen in einem einzigen
+`DELETE /api/households/shopping/items?ids=…&ids=…` aus Mealie heraus. Das ist die
+einzige Stelle in der App, die endgültig löscht — deshalb der Dialog davor, und
+deshalb kehren die Zeilen zurück, wenn Mealie ablehnt.
+
 ### Warengruppen (`config/katalog.php`)
 
 Geblieben ist die Gliederung: 8 Warengruppen, ihre Reihenfolge und ihre Läden.
@@ -298,7 +323,7 @@ Geblieben ist die Gliederung: 8 Warengruppen, ihre Reihenfolge und ihre Läden.
 ### Läden (`laeden`)
 
 Über Einkaufsliste **und** Vorrat stehen dieselben Filter-Chips: **Alle · Lidl ·
-Rewe · Getränkemarkt**.
+Rewe · Getränkemarkt · dm · Rossmann · Budni**.
 
 - **Pro Warengruppe:** `'laeden' => ['lidl']` in `config/katalog.php`. Jeder
   Artikel dieser Gruppe erbt es.
@@ -307,11 +332,12 @@ Rewe · Getränkemarkt**.
   halten (`'laeden' => 'rewe'`). Sie wird beim Kopieren in die Einkaufsliste
   mitgenommen. In Mealies Weboberfläche ist `extras` nicht editierbar; gesetzt
   wird es über die API.
-- **Erlaubte Schlüssel:** `lidl`, `rewe`, `getraenkemarkt` (`App\Katalog\Laden`).
-  Ein unbekannter Schlüssel fällt still weg.
-- **Jede Warengruppe gehört in genau einen Laden.** Steht sie in zweien, trennen
-  die Chips nichts mehr. Zwei Tests in `tests/Feature/EinkaufenLaedenTest.php`
-  halten die Regel fest.
+- **Erlaubte Schlüssel:** `lidl`, `rewe`, `getraenkemarkt`, `dm`, `rossmann`,
+  `budni` (`App\Katalog\Laden`). Ein unbekannter Schlüssel fällt still weg.
+- **Jede Warengruppe nennt Läden, aber nie alle.** Ohne Laden oder mit allen
+  trennen die Chips nichts mehr. Mehrere sind erlaubt, wo sie stimmen: Drogerie
+  gibt es bei Lidl, dm, Rossmann und Budni. Zwei Tests in
+  `tests/Feature/EinkaufenLaedenTest.php` halten die Regel fest.
 - **Ohne jede Zuordnung steht ein Artikel in jedem Filter.** Das gilt für alles
   unter einer Überschrift, die es im Katalog nicht gibt — etwa ein Lebensmittel,
   das gerade frisch aus einem Rezept entstanden ist: es erbt nichts und bleibt
@@ -328,6 +354,8 @@ kein Zustand eines Screens.
 - **Einkaufen:** „Alles abhaken“ nimmt nur mit, was gerade dasteht, und der
   Untertitel nennt beide Zahlen („5 von 12 Artikeln“). Der Block „Abgehakt“
   bleibt ungefiltert.
+- **Artikel von Hand** (siehe unten) bringen ihre Läden selbst mit — sie stehen
+  als `extras.laeden` an der Zeile und schlagen damit die Warengruppe.
 - **Vorrat:** Laden und Suche greifen zusammen (UND). Bleibt bei gesetztem
   Suchbegriff nichts übrig, sagt der Leerzustand dazu, dass ein Laden filtert —
   sonst sucht man einen Artikel, den der Chip gerade wegblendet.
@@ -444,12 +472,12 @@ Gerät, einen Emulator oder eine erreichbare Mealie-Instanz.
 
 ```
 app/
-├── NativeComponents/   Screens: Einkaufen, Vorrat, Wochenplan, Einstellungen
+├── NativeComponents/   Screens: Einkaufen, Vorrat, Wochenplan, ArtikelHinzufuegen, Einstellungen
 ├── Layouts/            TabsLayout (Root-Screens), StackLayout (gepushte Screens)
 ├── Katalog/            Warengruppen, Laden, Ladenfilter, Ladenzuordnung — config/katalog.php
-├── Vorrat/             Vorratsliste, Sitzung, Cache, Übersicht, Hinzufügen — die Mealie-Liste „Vorrat“
-├── Einkaufen/          Übersicht, Abschnitt, Zeile, Abhakvorgang — der Einkaufen-Screen
-├── Mealie/             Token, Verbindung, Einkaufsliste, Sitzung, Cache, Fehler
+├── Vorrat/             Vorratsliste, Sitzung, Cache, Übersicht — die Mealie-Liste „Vorrat“
+├── Einkaufen/          Übersicht, Abschnitt, Zeile, Abhakvorgang, Gruppenwahl — der Einkaufen-Screen
+├── Mealie/             Token, Verbindung, Einkaufsliste, Artikelanlage, Artikelloeschung, Warengruppen, Sitzung, Cache, Fehler
 ├── Wochenplan/         Wochenberechnung und Mealplan-Sitzung
 └── Icons/              generierte Icon-Enums (php artisan native-ui:generate-icons)
 

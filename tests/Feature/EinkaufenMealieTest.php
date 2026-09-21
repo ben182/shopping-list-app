@@ -150,10 +150,13 @@ function mitMealie(array $artikel, array $rezepte = [], int $aenderungsStatus = 
     fakeSecureStore('mealie-geheim-123');
 
     // Zuerst die Artikel-Routen: ein späteres `Http::fake()` legt seine Regel
-    // nur dahinter, und die Muster hier überschneiden sich nicht. Die zweite
-    // ist das Bulk-Update — ohne Schrägstrich am Ende und deshalb ein eigenes
-    // Muster, das die erste Regel nicht mitnimmt.
+    // nur dahinter, und die Muster hier überschneiden sich nicht. Das erste
+    // ist das Löschen, das seine IDs als Query trägt — ein ungefaktes Muster
+    // ginge wirklich ins Netz. Dann die einzelne Änderung und zuletzt das
+    // Bulk-Update: ohne Schrägstrich am Ende und deshalb ein eigenes Muster,
+    // das die Regel davor nicht mitnimmt.
     Http::fake([
+        '*/api/households/shopping/items?*' => Http::response([], $aenderungsStatus),
         '*/api/households/shopping/items/*' => Http::response([], $aenderungsStatus),
         '*/api/households/shopping/items' => Http::response([], $aenderungsStatus),
     ]);

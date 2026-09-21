@@ -15,6 +15,9 @@ enum Laden: string
     case Lidl = 'lidl';
     case Rewe = 'rewe';
     case Getraenkemarkt = 'getraenkemarkt';
+    case Dm = 'dm';
+    case Rossmann = 'rossmann';
+    case Budni = 'budni';
 
     /**
      * Alle Läden in Anzeigereihenfolge — die der Fälle.
@@ -45,6 +48,9 @@ enum Laden: string
             self::Lidl => 'Lidl',
             self::Rewe => 'Rewe',
             self::Getraenkemarkt => 'Getränkemarkt',
+            self::Dm => 'dm',
+            self::Rossmann => 'Rossmann',
+            self::Budni => 'Budni',
         };
     }
 }

@@ -114,7 +114,7 @@ it('zeigt den Leerzustand, wenn nichts auf der Liste steht', function () {
 
     Native::visit('/', platform: 'android')
         ->assertSee('Liste ist leer.')
-        ->assertSee('Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.')
+        ->assertSee('Tippe oben auf „+“ oder auf den Vorrat-Tab, um Artikel hinzuzufügen.')
         ->assertMissingElement('list_item')
         ->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'shopping_cart');
 });
@@ -183,7 +183,7 @@ it('hakt ohne Nachfrage sofort alles ab und stellt die Leiste zum Rückgängigma
 
     $screen->assertNativeNotCalled('Dialog.Alert')
         ->assertSee('Liste ist leer.')
-        ->assertSee('Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.')
+        ->assertSee('Tippe oben auf „+“ oder auf den Vorrat-Tab, um Artikel hinzuzufügen.')
         ->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
 
     expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toBe(['3 Artikel abgehakt', 'Rückgängig']);

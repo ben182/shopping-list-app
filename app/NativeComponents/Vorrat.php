@@ -6,6 +6,7 @@ use App\Icons\Android;
 use App\Icons\Ios;
 use App\Katalog\Laden;
 use App\Katalog\Ladenfilter;
+use App\Mealie\Artikelanlage;
 use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
 use App\Mealie\Eintrag;
@@ -15,7 +16,6 @@ use App\Mealie\Sitzung as Einkaufssitzung;
 use App\Mealie\Token;
 use App\Vorrat\Abschnitt;
 use App\Vorrat\Artikel;
-use App\Vorrat\Hinzufuegen;
 use App\Vorrat\Sitzung;
 use App\Vorrat\Uebersicht;
 use App\Vorrat\Vorratsliste;
@@ -24,7 +24,6 @@ use Native\Mobile\Edge\Element;
 use Native\Mobile\Edge\Layouts\Builders\NavAction;
 use Native\Mobile\Edge\Layouts\Builders\NavBarOptions;
 use Native\Mobile\Facades\Dialog;
-use Native\Mobile\Icon\IconResolver;
 use Native\Mobile\SecureStorageStatus;
 
 /**
@@ -260,7 +259,7 @@ class Vorrat extends Screen
         $listenId = (string) config('mealie.shopping_list_id');
         $vorlage = $artikel->roh;
 
-        $this->async(static fn (): array => Hinzufuegen::ausfuehren($basisUrl, $token, $timeout, $listenId, $vorlage))
+        $this->async(static fn (): array => Artikelanlage::ausfuehren($basisUrl, $token, $timeout, $listenId, $vorlage))
             ->timeout($timeout + 5)
             ->finished(function (array $ergebnis) use ($vorlaeufigeId): void {
                 if (! ($ergebnis['ok'] ?? false)) {
@@ -406,15 +405,5 @@ class Vorrat extends Screen
     private function uebersicht(): Uebersicht
     {
         return app(Uebersicht::class);
-    }
-
-    /**
-     * `leading-icon` und `icon` nehmen in Blade nur einen einzelnen Namen,
-     * keine `ios:`/`android:`-Paare wie `native:icon`. Die Auswahl muss
-     * deshalb hier passieren; ohne bekannte Plattform (Tests) gilt Android.
-     */
-    private function iconName(Ios $ios, Android $android): string
-    {
-        return IconResolver::resolve(null, $ios, $android)['icon'] ?? $android->value;
     }
 }

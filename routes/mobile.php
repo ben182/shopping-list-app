@@ -2,6 +2,7 @@
 
 use App\Layouts\StackLayout;
 use App\Layouts\TabsLayout;
+use App\NativeComponents\ArtikelHinzufuegen;
 use App\NativeComponents\Einkaufen;
 use App\NativeComponents\Einstellungen;
 use App\NativeComponents\Vorrat;
@@ -22,4 +23,5 @@ Route::nativeGroup(TabsLayout::class, function () {
  */
 Route::nativeGroup(StackLayout::class, function () {
     Route::native('/einstellungen', Einstellungen::class);
+    Route::native('/artikel-hinzufuegen', ArtikelHinzufuegen::class);
 });
