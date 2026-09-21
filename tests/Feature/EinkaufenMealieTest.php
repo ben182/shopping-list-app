@@ -2,7 +2,6 @@
 
 use App\Einkaufen\Uebersicht;
 use App\Einkaufen\Zeile;
-use App\Liste\EigeneListe;
 use App\Mealie\Sitzung;
 use App\Mealie\Token;
 use Ben182\AppLifecycle\Events\AppForegrounded;
@@ -27,6 +26,8 @@ use Native\Mobile\Testing\TestableComponent;
  * und zum Schluss die Notiz. Wer eine Notiz mitgibt, hängt sie deshalb auch
  * hinten an `display` an — genau darauf trifft die App.
  *
+ * `$laeden` ist die Ladenausnahme in `extras`, kommagetrennt wie in Mealie.
+ *
  * @param  list<string>  $rezeptIds
  * @return array<string, mixed>
  */
@@ -40,6 +41,7 @@ function mealieArtikel(
     ?string $id = null,
     ?string $lebensmittel = null,
     string $notiz = '',
+    string $laeden = '',
 ): array {
     return [
         'id' => $id ?? 'artikel-'.md5($display),
@@ -54,6 +56,8 @@ function mealieArtikel(
         'position' => $position,
         'createdAt' => $erstelltAm,
         'label' => $label === null ? null : ['id' => 'label-'.md5($label), 'name' => $label],
+        // Die Ladenausnahme, die ein Artikel aus dem Vorrat mitbringt.
+        'extras' => $laeden === '' ? [] : ['laeden' => $laeden],
         'recipeReferences' => array_map(
             fn (string $rezeptId) => ['recipeId' => $rezeptId, 'recipeQuantity' => 1.0],
             $rezeptIds,
@@ -154,7 +158,7 @@ function mitMealie(array $artikel, array $rezepte = [], int $aenderungsStatus = 
         '*/api/households/shopping/items' => Http::response([], $aenderungsStatus),
     ]);
 
-    mealieAntwortet($artikel, $rezepte);
+    mealieAntwortet([...vorgemerkteArtikel(), ...$artikel], $rezepte);
 }
 
 /**
@@ -202,13 +206,49 @@ function abgehaktZeilen(TestableComponent $screen): array
 }
 
 /**
- * Setzt eigene Artikel auf die Liste — Vorbedingung, nicht Prüfgegenstand.
+ * Artikel, die aus dem Vorrat auf die Einkaufsliste gewandert sind.
+ *
+ * Seit der Vorrat in Mealie liegt, unterscheiden sie sich dort in nichts von
+ * denen, die ein Rezept mitgebracht hat: derselbe Listeneintrag, dieselbe
+ * Zeile. Die Funktion merkt sie vor; `mitMealie()` stellt sie der Liste
+ * voran — die Tests rufen beides in dieser Reihenfolge auf.
+ *
+ * @var array<string, array{string, string}> Katalog-ID => [Name, Mealie-Label]
  */
+const AUS_DEM_VORRAT = [
+    'tofu' => ['Tofu', 'Fleischprodukte'],
+    'salz' => ['Salz', 'Gewürze'],
+    'bananen' => ['Bananen', 'Obst & Gemüse'],
+    'aepfel' => ['Äpfel', 'Obst & Gemüse'],
+];
+
 function eigeneArtikel(string ...$artikelIds): void
 {
-    foreach ($artikelIds as $artikelId) {
-        app(EigeneListe::class)->hinzufuegen($artikelId);
-    }
+    $GLOBALS['vorratsartikel'] = array_map(
+        fn (string $artikelId, int $position) => mealieArtikel(
+            AUS_DEM_VORRAT[$artikelId][0],
+            label: AUS_DEM_VORRAT[$artikelId][1],
+            position: $position,
+            id: 'eigen-'.$artikelId,
+        ),
+        $artikelIds,
+        array_keys($artikelIds),
+    );
+}
+
+/**
+ * Die vorgemerkten Vorratsartikel — und räumt die Vormerkung ab, damit sie
+ * nicht in den nächsten Test durchschlägt.
+ *
+ * @return list<array<string, mixed>>
+ */
+function vorgemerkteArtikel(): array
+{
+    $artikel = $GLOBALS['vorratsartikel'] ?? [];
+
+    $GLOBALS['vorratsartikel'] = [];
+
+    return $artikel;
 }
 
 it('lädt beim Öffnen des Tabs die konfigurierte Mealie-Liste und zeigt die offenen Artikel', function () {
@@ -280,19 +320,20 @@ it('stellt die Katalog-Gruppen voran und sortiert die übrigen alphabetisch', fu
         ->toBe(['Obst & Gemüse', 'Drogerie', 'Baumarkt', 'Öl & Co', 'Tierbedarf']);
 });
 
-it('stellt in jeder Gruppe die eigenen Artikel vor die aus Mealie', function () {
+it('ordnet die Artikel einer Gruppe nach Mealies Reihenfolge, nicht nach ihrem Namen', function () {
     eigeneArtikel('bananen', 'aepfel');
 
     mitMealie([
-        mealieArtikel('2 Zucchini', label: 'Gemüse', position: 1),
-        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', position: 0),
+        mealieArtikel('2 Zucchini', label: 'Gemüse', position: 3),
+        mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', position: 2),
     ]);
 
+    // `position` entscheidet — die beiden aus dem Vorrat stehen davor, weil
+    // Mealie sie so zurückgibt, nicht weil die App sie vorzieht.
     expect(listenAbschnitte(Native::visit('/')))
         ->toBe([[
             'ueberschrift' => 'Obst & Gemüse',
-            // Katalogreihenfolge in Anhang A: Äpfel vor Bananen.
-            'artikel' => ['Äpfel', 'Bananen', '1 Kopf Brokkoli', '2 Zucchini'],
+            'artikel' => ['Bananen', 'Äpfel', '1 Kopf Brokkoli', '2 Zucchini'],
         ]]);
 });
 
@@ -306,13 +347,14 @@ it('behält bei gleicher Position die Reihenfolge nach Erstellzeitpunkt', functi
         ->toBe(['Zuerst erfasst', 'Später erfasst']);
 });
 
-it('zeichnet eine Mealie-Zeile mit leerer Checkbox, Notiz und Besteck-Icon', function () {
+it('zeichnet eine Rezeptzeile mit leerer Checkbox, Notiz und Besteck-Icon', function () {
     mitMealie([mealieArtikel(
         '1 handvoll Koriander frisch, gehackt',
         label: 'Gemüse',
         lebensmittel: 'Koriander',
         notiz: 'frisch, gehackt',
-    )]);
+        rezeptIds: ['rezept-1'],
+    )], ['rezept-1' => 'Currysuppe']);
 
     Native::visit('/', platform: 'android')
         ->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === '1 handvoll Koriander'
@@ -320,7 +362,7 @@ it('zeichnet eine Mealie-Zeile mit leerer Checkbox, Notiz und Besteck-Icon', fun
             && ($node['props']['leading_type'] ?? null) === 'checkbox'
             && ($node['props']['leading_checked'] ?? null) === false
             && ($node['props']['trailing_icon'] ?? null) === 'restaurant'
-            && ($node['props']['trailing_a11y_label'] ?? null) === 'aus Mealie');
+            && ($node['props']['trailing_a11y_label'] ?? null) === 'aus einem Rezept');
 });
 
 it('schneidet nur die Notiz ab und lässt Mealies Schreibweise der Menge stehen', function () {
@@ -422,7 +464,7 @@ it('lädt einen Rezeptnamen nach, der nicht in der Listen-Antwort steht', functi
     expect(rezeptBlock(Native::visit('/')))->toBe(['Pasta Arrabiata']);
 });
 
-it('gibt eigenen Zeilen kein Trailing-Icon', function () {
+it('gibt einer Zeile ohne Rezept kein Trailing-Icon', function () {
     eigeneArtikel('tofu');
 
     mitMealie([]);
@@ -430,7 +472,18 @@ it('gibt eigenen Zeilen kein Trailing-Icon', function () {
     Native::visit('/', platform: 'android')
         ->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === 'Tofu'
             && ! isset($node['props']['trailing_icon']))
-        ->assertMissingElement('list_item', fn (array $node) => ($node['props']['trailing_a11y_label'] ?? null) === 'aus Mealie');
+        ->assertMissingElement('list_item', fn (array $node) => ($node['props']['trailing_a11y_label'] ?? null) === 'aus einem Rezept');
+});
+
+it('setzt das Besteck-Icon an die Zeilen, die ein Rezept mitgebracht hat', function () {
+    mitMealie(
+        [mealieArtikel('2 Zucchini', label: 'Gemüse', rezeptIds: ['rezept-1'])],
+        ['rezept-1' => 'Zucchinipfanne'],
+    );
+
+    Native::visit('/', platform: 'android')
+        ->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === '2 Zucchini'
+            && ($node['props']['trailing_a11y_label'] ?? null) === 'aus einem Rezept');
 });
 
 it('zählt im Untertitel eigene und offene Mealie-Artikel zusammen', function () {
@@ -466,16 +519,15 @@ it('weist ohne hinterlegtes Token auf die Einstellungen hin und ruft Mealie nich
     fakeSecureStore();
     mealieAntwortet([]);
 
-    eigeneArtikel('tofu');
-
     $screen = Native::visit('/', platform: 'android');
 
     $screen->assertSee('Mealie nicht verbunden')
         ->assertSee('Einstellungen')
         ->assertElement('icon', fn (array $node) => ($node['props']['name'] ?? null) === 'info');
 
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+    // Ohne Token bleibt der Screen leer: die Liste liegt vollständig in
+    // Mealie, es gibt nichts mehr, was das Gerät für sich hätte.
+    expect(listenAbschnitte($screen))->toBe([]);
 
     Http::assertNothingSent();
 });
@@ -500,23 +552,18 @@ it('schweigt bei einem Lesefehler des Keystores, statt zum Verbinden aufzuforder
     Http::assertNothingSent();
 });
 
-it('zeigt die eigenen Artikel auch dann, wenn Mealie nicht antwortet', function () {
-    eigeneArtikel('tofu');
-
+it('lässt die Ladezeile fallen, wenn Mealie nicht antwortet', function () {
     AsyncTask::fake();
     fakeSecureStore('mealie-geheim-123');
     Http::fake(fn () => throw new ConnectionException('Zeitüberschreitung'));
 
     $screen = Native::visit('/');
 
-    expect(listenAbschnitte($screen))->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
     expect($screen->get('mealieLaedt'))->toBeFalse();
+    $screen->assertSee('Mealie nicht erreichbar');
 });
 
 it('zeigt nur beim ersten Ladevorgang einer Sitzung die Zeile „Mealie wird geladen…“', function () {
-    // Ein eigener Artikel, damit die Liste (und mit ihr Pull-to-Refresh) da ist.
-    eigeneArtikel('tofu');
-
     AsyncTask::fake();
     fakeSecureStore();
     mealieAntwortet([]);
@@ -537,14 +584,14 @@ it('zeigt nur beim ersten Ladevorgang einer Sitzung die Zeile „Mealie wird gel
         return Http::response(['listItems' => [], 'recipeReferences' => []]);
     });
 
-    $screen->press('neuLaden');
+    $screen->call('neuLaden');
 
     expect($beimErsten)->toBeTrue();
 
     $screen->assertDontSee('Mealie wird geladen…');
 
     $beimZweiten = null;
-    $screen->press('neuLaden');
+    $screen->call('neuLaden');
 
     expect($beimZweiten)->toBeFalse();
 });
@@ -826,19 +873,19 @@ it('hakt einen Artikel wieder ab, wenn das Zurückholen in einen Timeout läuft'
     $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Änderung fehlgeschlagen');
 });
 
-it('hält eigene Artikel aus dem Abschnitt „Abgehakt“ heraus und schickt sie weiter in den Vorrat', function () {
-    eigeneArtikel('tofu');
+it('nimmt einen abgehakten Artikel in den Block auf und zeigt ihn wieder im Vorrat', function () {
+    mitVorrat(
+        [vorratArtikel('Tofu', label: 'Kühlregal', lebensmittel: 'Tofu')],
+        [mealieArtikel('200 g Tofu', label: 'Fleischprodukte', lebensmittel: 'Tofu', id: 'tofu-1')],
+    );
 
-    mitMealie([mealieArtikel('1 Liter Milch', label: 'Milchprodukte', abgehakt: true)]);
+    $screen = Native::visit('/')->tap('200 g Tofu');
 
-    $screen = Native::visit('/')->tap('Abgehakt (1)')->tap('Tofu');
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
 
-    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)', '1 Liter Milch']);
-
-    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
-        ->firstWhere('ueberschrift', 'Kühlregal')['artikel'];
-
-    expect($vorrat)->toContain('Tofu');
+    // Was im Wagen liegt, gehört wieder in den Vorrat — sonst stünde er nach
+    // einem Einkauf leer da, bis jemand in Mealie aufräumt.
+    expect(vorratZeilen(Native::visit('/vorrat')))->toBe(['Tofu']);
 });
 
 /*
@@ -856,6 +903,7 @@ it('hält eigene Artikel aus dem Abschnitt „Abgehakt“ heraus und schickt sie
  */
 function mealieAntwortetDannNicht(array $artikel, ?int $status = null): Closure
 {
+    $artikel = [...vorgemerkteArtikel(), ...$artikel];
     $ausfall = false;
 
     Http::fake(function () use ($artikel, $status, &$ausfall) {
@@ -1004,7 +1052,7 @@ it('sperrt die Mealie-Zeilen, solange das Banner steht, und sagt beim Tap warum'
     Http::assertNotSent(fn ($anfrage) => $anfrage->method() === 'PUT');
 });
 
-it('lässt eigene Artikel bedienbar, während das Banner steht', function () {
+it('sperrt jede Zeile, während das Banner steht — es gibt keine mehr, die ohne Mealie auskäme', function () {
     eigeneArtikel('tofu');
 
     $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1')]);
@@ -1014,12 +1062,15 @@ it('lässt eigene Artikel bedienbar, während das Banner steht', function () {
     $ausfall();
     $screen->press('neuLaden');
 
-    expect(knotenMitRef($screen, 'einkaufen-tofu')['props']['disabled'] ?? false)->toBeFalse();
+    expect(knotenMitRef($screen, 'mealie-eigen-tofu')['props']['disabled'] ?? false)->toBeTrue();
 
     $screen->tap('Tofu');
 
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
+    // Der Stand aus dem Cache steht weiter da, unverändert.
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']],
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
+    ]);
 });
 
 it('nimmt das Banner wieder weg, sobald ein Neuladen gelingt', function () {
@@ -1067,25 +1118,22 @@ it('zeigt ohne Cache nur das Banner und darunter den Leerzustand', function () {
     expect(listenAbschnitte($screen))->toBe([]);
 });
 
-it('zeigt ohne Cache das Banner über den eigenen Artikeln', function () {
-    eigeneArtikel('tofu');
-
-    AsyncTask::fake();
-    fakeSecureStore('mealie-geheim-123');
-    Http::fake(fn () => throw new ConnectionException('Zeitüberschreitung'));
+it('stellt das Banner über die gecachte Liste, statt sie wegzunehmen', function () {
+    $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
     $screen = Native::visit('/');
+
+    $ausfall();
+    $screen->press('neuLaden');
 
     $screen->assertSee('Mealie nicht erreichbar')
         ->assertDontSee('Liste ist leer.');
 
     expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 });
 
 it('vergisst den Cache, sobald kein Token mehr hinterlegt ist', function () {
-    eigeneArtikel('tofu');
-
     mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
     Native::visit('/');
@@ -1098,8 +1146,7 @@ it('vergisst den Cache, sobald kein Token mehr hinterlegt ist', function () {
     $screen->assertSee('Mealie nicht verbunden')
         ->assertDontSee('1 Kopf Brokkoli');
 
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+    expect(listenAbschnitte($screen))->toBe([]);
 });
 
 it('hat die gecachten Artikel schon auf dem Schirm, während die neue Antwort noch unterwegs ist', function () {
@@ -1178,9 +1225,7 @@ it('zählt in der Leiste auch einen einzelnen Mealie-Artikel', function () {
     expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
 });
 
-it('räumt ohne Nachfrage die eigenen Artikel weg und hakt alle offenen Mealie-Artikel in einem Aufruf ab', function () {
-    eigeneArtikel('tofu', 'salz');
-
+it('hakt alle offenen Artikel in einem einzigen Aufruf ab', function () {
     mitMealie([
         mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1'),
         mealieArtikel('2 Zucchini', label: 'Gemüse', id: 'zucchini-1', position: 1),
@@ -1199,11 +1244,6 @@ it('räumt ohne Nachfrage die eigenen Artikel weg und hakt alle offenen Mealie-A
         // „restliche Felder unverändert“: Mealies eigene Darstellung geht zurück.
         && $anfrage->data()[0]['display'] === '1 Kopf Brokkoli'
         && $anfrage->data()[0]['createdAt'] === '2026-09-12T15:37:15.316035Z');
-
-    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
-        ->flatMap(fn (array $abschnitt) => $abschnitt['artikel']);
-
-    expect($vorrat)->toContain('Tofu', 'Salz')->toHaveCount(112);
 });
 
 it('stellt die Leiste über den Block „Abgehakt“', function () {
@@ -1217,9 +1257,7 @@ it('stellt die Leiste über den Block „Abgehakt“', function () {
         ->toBeLessThan(array_search('abgehakt-block', $refs, strict: true));
 });
 
-it('holt mit „Rückgängig“ die Mealie-Artikel per einem Bulk-Update zurück auf die Liste', function () {
-    eigeneArtikel('tofu');
-
+it('holt mit „Rückgängig“ die Artikel per einem Bulk-Update zurück auf die Liste', function () {
     mitMealie([
         mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse', id: 'brokkoli-1'),
         mealieArtikel('2 Zucchini', label: 'Gemüse', id: 'zucchini-1', position: 1),
@@ -1227,10 +1265,8 @@ it('holt mit „Rückgängig“ die Mealie-Artikel per einem Bulk-Update zurück
 
     $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
 
-    expect(listenAbschnitte($screen))->toBe([
-        ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli', '2 Zucchini']],
-        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
-    ]);
+    expect(listenAbschnitte($screen))
+        ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli', '2 Zucchini']]]);
     expect(abgehaktZeilen($screen))->toBe([]);
     expect(rueckgaengigLeiste($screen))->toBeNull();
 
@@ -1242,9 +1278,7 @@ it('holt mit „Rückgängig“ die Mealie-Artikel per einem Bulk-Update zurück
         ->and(collect($zurueckgeholt->first()->data())->pluck('id')->all())->toBe(['brokkoli-1', 'zucchini-1']);
 });
 
-it('behält die eigenen Artikel zurückgeholt, wenn das Bulk-Update beim Rückgängigmachen scheitert', function () {
-    eigeneArtikel('tofu');
-
+it('meldet es per Toast, wenn das Bulk-Update beim Rückgängigmachen scheitert', function () {
     AsyncTask::fake();
     fakeSecureStore('mealie-geheim-123');
     // Das Abhaken darf durchgehen, erst das Zurückholen scheitert.
@@ -1255,16 +1289,13 @@ it('behält die eigenen Artikel zurückgeholt, wenn das Bulk-Update beim Rückg�
 
     $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
 
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
+    expect(listenAbschnitte($screen))->toBe([]);
     expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
 
     $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Zurückholen fehlgeschlagen');
 });
 
-it('behält die eigenen Artikel entfernt und holt nur die Mealie-Artikel zurück, wenn das Bulk-Update scheitert', function () {
-    eigeneArtikel('tofu');
-
+it('holt die Artikel zurück und räumt die Leiste ab, wenn das Bulk-Update scheitert', function () {
     mitMealie([
         mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse'),
         mealieArtikel('2 Zucchini', label: 'Gemüse', position: 1),
@@ -1278,16 +1309,9 @@ it('behält die eigenen Artikel entfernt und holt nur die Mealie-Artikel zurück
 
     $screen->assertNativeCalled('Dialog.Toast', fn (array $params) => $params['message'] === 'Mealie: Abhaken fehlgeschlagen');
 
-    // Die Leiste zählt jetzt nur noch den einen eigenen Artikel — die
-    // Mealie-Artikel stehen ja wieder offen da.
-    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
-
-    $screen->press('rueckgaengigMachen');
-
-    expect(listenAbschnitte($screen))->toBe([
-        ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli', '2 Zucchini']],
-        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']],
-    ]);
+    // Es ist nichts passiert, was sich zurücknehmen ließe — die Artikel
+    // stehen ja wieder offen da, und mit dem leeren Vorgang geht die Leiste.
+    expect(rueckgaengigLeiste($screen))->toBeNull();
 });
 
 it('holt die Mealie-Artikel auch zurück, wenn das Bulk-Update in einen Timeout läuft', function () {
@@ -1307,9 +1331,7 @@ it('holt die Mealie-Artikel auch zurück, wenn das Bulk-Update in einen Timeout 
     expect(rueckgaengigLeiste($screen))->toBeNull();
 });
 
-it('hakt im Fehlerzustand nur die eigenen Artikel ab und zählt auch nur die', function () {
-    eigeneArtikel('tofu', 'salz');
-
+it('rührt im Fehlerzustand nichts an: ohne Mealie lässt sich nichts abhaken', function () {
     $ausfall = mitMealieAusfall([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
     $screen = Native::visit('/');
@@ -1318,7 +1340,7 @@ it('hakt im Fehlerzustand nur die eigenen Artikel ab und zählt auch nur die', f
 
     $screen->press('neuLaden')->press('alleAbhaken');
 
-    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('2 Artikel abgehakt');
+    expect(rueckgaengigLeiste($screen))->toBeNull();
     expect(listenAbschnitte($screen))
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 
@@ -1339,15 +1361,13 @@ it('tut nichts, wenn im Fehlerzustand nur Mealie-Artikel offen sind', function (
         ->toBe([['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['1 Kopf Brokkoli']]]);
 });
 
-it('hakt ohne hinterlegtes Token nur die eigenen Artikel ab', function () {
-    eigeneArtikel('tofu');
-
+it('hat ohne hinterlegtes Token nichts abzuhaken', function () {
     AsyncTask::fake();
     fakeSecureStore();
 
-    $screen = Native::visit('/')->press('alleAbhaken');
+    $screen = Native::visit('/')->call('alleAbhaken');
 
-    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
+    expect(rueckgaengigLeiste($screen))->toBeNull();
 
     $screen->assertSee('Liste ist leer.');
 });

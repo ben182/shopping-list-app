@@ -3,30 +3,19 @@
 use App\Katalog\Katalog;
 use App\Katalog\Laden;
 use App\Katalog\Ladenfilter;
-use App\Liste\EigeneListe;
 use Native\Mobile\Testing\Native;
 use Native\Mobile\Testing\TestableComponent;
 
 /*
- * Der Ladenfilter über der Einkaufsliste. Geprüft wird am Screen: die Chips
- * kommen aus dem Wire-Tree, getippt wird über `toggle()` — ein Chip schickt
- * seinen neuen Zustand durch `on_change`, wie das Gerät es täte.
+ * Der Ladenfilter über Einkaufsliste und Vorrat. Geprüft wird am Screen: die
+ * Chips kommen aus dem Wire-Tree, getippt wird über `toggle()` — ein Chip
+ * schickt seinen neuen Zustand durch `on_change`, wie das Gerät es täte.
  *
- * Welcher Artikel in welchem Laden steht, sagt `config/katalog.php`. Die
- * Tests nennen bewusst nur ein paar wenige, deren Zuordnung eindeutig ist —
- * sonst prüften sie die Konfiguration gegen sich selbst.
+ * Welche Läden eine Warengruppe hat, sagt `config/katalog.php`; die Ausnahme
+ * am einzelnen Artikel kommt als `extras.laeden` aus Mealie. Die Tests nennen
+ * bewusst nur ein paar wenige, deren Zuordnung eindeutig ist — sonst prüften
+ * sie die Konfiguration gegen sich selbst.
  */
-
-/**
- * Setzt Artikel über dieselbe Fachklasse auf die Liste, die der Vorrat
- * benutzt — die Vorbedingung des Tests, nicht sein Prüfgegenstand.
- */
-function aufDieListeFuerLaeden(string ...$artikelIds): void
-{
-    foreach ($artikelIds as $artikelId) {
-        app(EigeneListe::class)->hinzufuegen($artikelId);
-    }
-}
 
 /**
  * Beschriftung und Zustand der Filter-Chips in Render-Reihenfolge.
@@ -53,8 +42,25 @@ function listenArtikel(TestableComponent $screen): array
     return array_merge(...array_column(listenAbschnitte($screen), 'artikel')) ?: [];
 }
 
+/**
+ * Vier Artikel, über die drei Läden verteilt: Äpfel erben Lidl von ihrer
+ * Warengruppe, Tofu und Tempeh tragen die Rewe-Ausnahme aus dem Vorrat mit,
+ * Bier erbt den Getränkemarkt.
+ *
+ * @return list<array<string, mixed>>
+ */
+function artikelInDreiLaeden(): array
+{
+    return [
+        mealieArtikel('Äpfel', label: 'Obst & Gemüse', position: 0),
+        mealieArtikel('Tofu', label: 'Kühlregal', position: 1, laeden: 'rewe'),
+        mealieArtikel('Tempeh', label: 'Kühlregal', position: 2, laeden: 'rewe'),
+        mealieArtikel('Bier', label: 'Getränke', position: 3),
+    ];
+}
+
 it('setzt über die Liste einen Chip je Laden, „Alle“ zuerst und aktiv', function () {
-    aufDieListeFuerLaeden('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Kühlregal')]);
 
     expect(ladenChips(Native::visit('/')))->toBe([
         ['label' => 'Alle', 'aktiv' => true],
@@ -65,13 +71,13 @@ it('setzt über die Liste einen Chip je Laden, „Alle“ zuerst und aktiv', fun
 });
 
 it('lässt die Chips weg, solange nichts auf der Liste steht', function () {
+    mitMealie([]);
+
     expect(ladenChips(Native::visit('/')))->toBe([]);
 });
 
 it('zeigt nach einem Tap auf einen Chip nur noch, was es in diesem Laden gibt', function () {
-    // Äpfel sind Grundnahrungsmittel und damit Lidl; Tofu und Tempeh
-    // gehören zu den Spezialitäten bei Rewe, Bier in den Getränkemarkt.
-    aufDieListeFuerLaeden('aepfel', 'tofu', 'tempeh', 'bier');
+    mitMealie(artikelInDreiLaeden());
 
     $screen = Native::visit('/')->toggle('laden-lidl', true);
 
@@ -87,8 +93,23 @@ it('zeigt nach einem Tap auf einen Chip nur noch, was es in diesem Laden gibt', 
     ]);
 });
 
+it('lässt die Ausnahme am Artikel die Läden seiner Warengruppe überschreiben', function () {
+    mitMealie([
+        mealieArtikel('Sojajoghurt', label: 'Kühlregal', position: 0),
+        mealieArtikel('Tofu', label: 'Kühlregal', position: 1, laeden: 'rewe'),
+    ]);
+
+    $screen = Native::visit('/');
+
+    expect(listenArtikel($screen->toggle('laden-lidl', true)))->toBe(['Sojajoghurt']);
+    expect(listenArtikel($screen->toggle('laden-rewe', true)))->toBe(['Tofu']);
+});
+
 it('behält die Warengruppen als Überschriften, statt nach Laden zu gruppieren', function () {
-    aufDieListeFuerLaeden('zaziki', 'tofu', 'suess-sauer-sauce');
+    mitMealie([
+        mealieArtikel('Zaziki', label: 'Kühlregal', position: 0, laeden: 'rewe'),
+        mealieArtikel('Süß-Sauer-Sauce', label: 'Würzmittel', position: 1, laeden: 'rewe'),
+    ]);
 
     $ueberschriften = array_column(listenAbschnitte(Native::visit('/')->toggle('laden-rewe', true)), 'ueberschrift');
 
@@ -98,7 +119,10 @@ it('behält die Warengruppen als Überschriften, statt nach Laden zu gruppieren'
 });
 
 it('führt ein zweiter Tap auf den aktiven Chip zurück auf „Alle“', function () {
-    aufDieListeFuerLaeden('tofu', 'bier');
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Kühlregal', position: 0, laeden: 'rewe'),
+        mealieArtikel('Bier', label: 'Getränke', position: 1),
+    ]);
 
     $screen = Native::visit('/')->toggle('laden-getraenkemarkt', true);
 
@@ -113,17 +137,20 @@ it('führt ein zweiter Tap auf den aktiven Chip zurück auf „Alle“', functio
 });
 
 it('wechselt mit einem Tap direkt von einem Laden zum nächsten', function () {
-    aufDieListeFuerLaeden('tofu', 'bier');
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Kühlregal', position: 0, laeden: 'rewe'),
+        mealieArtikel('Bier', label: 'Getränke', position: 1),
+    ]);
 
     $screen = Native::visit('/')
-        ->toggle('laden-lidl', true)
+        ->toggle('laden-rewe', true)
         ->toggle('laden-getraenkemarkt', true);
 
     expect(listenArtikel($screen))->toBe(['Bier']);
 });
 
 it('nennt im Untertitel beide Zahlen, solange ein Laden filtert', function () {
-    aufDieListeFuerLaeden('aepfel', 'tofu', 'tempeh', 'bier');
+    mitMealie(artikelInDreiLaeden());
 
     $screen = Native::visit('/');
 
@@ -134,7 +161,7 @@ it('nennt im Untertitel beide Zahlen, solange ein Laden filtert', function () {
 });
 
 it('zeigt einen eigenen Leerzustand, wenn im gewählten Laden nichts ansteht', function () {
-    aufDieListeFuerLaeden('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Kühlregal', laeden: 'rewe')]);
 
     $screen = Native::visit('/')->toggle('laden-getraenkemarkt', true);
 
@@ -150,7 +177,13 @@ it('zeigt einen eigenen Leerzustand, wenn im gewählten Laden nichts ansteht', f
 });
 
 it('behält den gewählten Laden über einen Tab-Wechsel hinweg', function () {
-    aufDieListeFuerLaeden('tofu', 'bier');
+    mitVorrat(
+        [vorratArtikel('Wasser (still)', label: 'Getränke')],
+        [
+            mealieArtikel('Tofu', label: 'Kühlregal', position: 0, laeden: 'rewe'),
+            mealieArtikel('Bier', label: 'Getränke', position: 1),
+        ],
+    );
 
     // Derselbe Weg wie auf dem Gerät: unten in den Vorrat und wieder zurück
     // — jeder Tab-Wechsel ersetzt den Root-Screen und mountet ihn neu.
@@ -165,20 +198,26 @@ it('behält den gewählten Laden über einen Tab-Wechsel hinweg', function () {
 });
 
 it('hakt mit „Alles abhaken“ nur ab, was der gewählte Laden zeigt', function () {
-    aufDieListeFuerLaeden('aepfel', 'tofu', 'bier');
+    mitMealie([
+        mealieArtikel('Äpfel', label: 'Obst & Gemüse', position: 0, id: 'aepfel-1'),
+        mealieArtikel('Bier', label: 'Getränke', position: 1, id: 'bier-1'),
+    ]);
 
     $screen = Native::visit('/')
         ->toggle('laden-getraenkemarkt', true)
         ->press('alleAbhaken');
 
     expect(listenArtikel($screen))->toBe([]);
-    expect(app(EigeneListe::class)->artikelIds())->toBe(['aepfel', 'tofu']);
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
 
-    expect(listenArtikel($screen->toggle('laden-getraenkemarkt', false)))->toBe(['Äpfel', 'Tofu']);
+    expect(listenArtikel($screen->toggle('laden-getraenkemarkt', false)))->toBe(['Äpfel']);
 });
 
 it('holt „Rückgängig“ danach genau die abgehakten Artikel zurück', function () {
-    aufDieListeFuerLaeden('aepfel', 'bier');
+    mitMealie([
+        mealieArtikel('Äpfel', label: 'Obst & Gemüse', position: 0, id: 'aepfel-1'),
+        mealieArtikel('Bier', label: 'Getränke', position: 1, id: 'bier-1'),
+    ]);
 
     $screen = Native::visit('/')
         ->toggle('laden-getraenkemarkt', true)
@@ -186,11 +225,11 @@ it('holt „Rückgängig“ danach genau die abgehakten Artikel zurück', functi
         ->press('rueckgaengigMachen');
 
     expect(listenArtikel($screen))->toBe(['Bier']);
-    expect(app(EigeneListe::class)->artikelIds())->toBe(['aepfel', 'bier']);
+    expect(abgehaktZeilen($screen))->toBe([]);
 });
 
 it('hält den gewählten Laden in der Sitzung und sonst nirgends', function () {
-    aufDieListeFuerLaeden('tofu', 'bier');
+    mitMealie([mealieArtikel('Bier', label: 'Getränke')]);
 
     Native::visit('/')->toggle('laden-getraenkemarkt', true);
 
@@ -206,10 +245,18 @@ it('hält den gewählten Laden in der Sitzung und sonst nirgends', function () {
 it('lässt einen Artikel ohne hinterlegten Laden in jedem Filter stehen', function () {
     config()->set('katalog.gruppen.obst-gemuese.laeden', []);
 
-    $katalog = app(Katalog::class);
+    mitMealie([mealieArtikel('Äpfel', label: 'Obst & Gemüse')]);
 
-    expect($katalog->imLaden(['aepfel'], Laden::Lidl))->toBe(['aepfel']);
-    expect($katalog->imLaden(['aepfel'], Laden::Getraenkemarkt))->toBe(['aepfel']);
+    $screen = Native::visit('/');
+
+    expect(listenArtikel($screen->toggle('laden-lidl', true)))->toBe(['Äpfel']);
+    expect(listenArtikel($screen->toggle('laden-getraenkemarkt', true)))->toBe(['Äpfel']);
+});
+
+it('lässt einen Artikel in einer Gruppe ohne Katalog-Eintrag in jedem Filter stehen', function () {
+    mitMealie([mealieArtikel('1 Packung Katzenstreu', label: 'Tierbedarf')]);
+
+    expect(listenArtikel(Native::visit('/')->toggle('laden-rewe', true)))->toBe(['1 Packung Katzenstreu']);
 });
 
 it('ignoriert einen unbekannten Laden-Schlüssel in der Konfiguration', function () {
@@ -226,6 +273,8 @@ it('ignoriert einen unbekannten Laden-Schlüssel in der Konfiguration', function
  */
 
 it('setzt dieselben Chips auch über den Vorrat', function () {
+    mitVorrat([vorratArtikel('Äpfel', label: 'Obst & Gemüse')]);
+
     expect(ladenChips(Native::visit('/vorrat')))->toBe([
         ['label' => 'Alle', 'aktiv' => true],
         ['label' => 'Lidl', 'aktiv' => false],
@@ -235,20 +284,26 @@ it('setzt dieselben Chips auch über den Vorrat', function () {
 });
 
 it('zeigt im Vorrat nach einem Tap nur noch, was es im Laden gibt', function () {
+    mitVorrat([
+        vorratArtikel('Äpfel', label: 'Obst & Gemüse', position: 0),
+        vorratArtikel('Wasser (still)', label: 'Getränke', position: 1),
+        vorratArtikel('Bier', label: 'Getränke', position: 2),
+    ]);
+
     $screen = Native::visit('/vorrat')->toggle('laden-getraenkemarkt', true);
 
     expect(array_column(listenAbschnitte($screen), 'ueberschrift'))->toBe(['Getränke']);
-
-    // „Wein“ und „Energy Drink“ stehen im Katalog zusätzlich bei Rewe bzw.
-    // überall — im Getränkemarkt gibt es sie trotzdem.
-    expect(listenArtikel($screen))->toBe([
-        'Wasser (still)', 'Wasser (Sprudel)', 'Saft', 'Bier',
-        'Wein (vegan)', 'Cola', 'Energy Drink',
-    ]);
+    expect(listenArtikel($screen))->toBe(['Wasser (still)', 'Bier']);
 });
 
 it('teilt die Wahl zwischen Vorrat und Einkaufen', function () {
-    aufDieListeFuerLaeden('tofu', 'bier');
+    mitVorrat(
+        [vorratArtikel('Äpfel', label: 'Obst & Gemüse')],
+        [
+            mealieArtikel('Tofu', label: 'Kühlregal', position: 0, laeden: 'rewe'),
+            mealieArtikel('Bier', label: 'Getränke', position: 1),
+        ],
+    );
 
     $einkaufen = Native::visit('/vorrat')
         ->toggle('laden-getraenkemarkt', true)
@@ -260,15 +315,23 @@ it('teilt die Wahl zwischen Vorrat und Einkaufen', function () {
 });
 
 it('verbindet im Vorrat Suche und Laden mit UND', function () {
-    // „Wasser“ trifft zwei Getränke; bei Lidl bleibt davon keines übrig.
+    mitVorrat([
+        vorratArtikel('Wasser (still)', label: 'Getränke', position: 0),
+        vorratArtikel('Wasser (Sprudel)', label: 'Getränke', position: 1),
+        vorratArtikel('Äpfel', label: 'Obst & Gemüse', position: 2),
+    ]);
+
     $screen = Native::visit('/vorrat')->call('suchen', 'Wasser');
 
     expect(listenArtikel($screen))->toBe(['Wasser (still)', 'Wasser (Sprudel)']);
 
+    // Wasser gibt es im Getränkemarkt, nicht bei Lidl.
     expect(listenArtikel($screen->toggle('laden-lidl', true)))->toBe([]);
 });
 
 it('sagt beim leeren Suchergebnis dazu, dass ein Laden filtert', function () {
+    mitVorrat([vorratArtikel('Wasser (still)', label: 'Getränke')]);
+
     Native::visit('/vorrat')
         ->toggle('laden-lidl', true)
         ->call('suchen', 'Wasser')
@@ -277,6 +340,8 @@ it('sagt beim leeren Suchergebnis dazu, dass ein Laden filtert', function () {
 });
 
 it('lässt den Hinweis auf den Laden weg, solange keiner filtert', function () {
+    mitVorrat([vorratArtikel('Äpfel', label: 'Obst & Gemüse')]);
+
     Native::visit('/vorrat')
         ->call('suchen', 'Gibtsnicht')
         ->assertSee('Keine Treffer für „Gibtsnicht“.')
@@ -284,9 +349,15 @@ it('lässt den Hinweis auf den Laden weg, solange keiner filtert', function () {
 });
 
 it('zeigt im Vorrat einen eigenen Leerzustand, wenn für den Laden alles auf der Liste ist', function () {
-    // Alle Getränke auf die Liste — der Getränkemarkt ist damit abgearbeitet,
-    // der Rest des Vorrats aber nicht.
-    aufDieListeFuerLaeden('wasser-still', 'wasser-sprudel', 'saft', 'bier', 'wein', 'cola', 'energy-drink');
+    // Das eine Getränk steht schon auf der Einkaufsliste — der Getränkemarkt
+    // ist damit abgearbeitet, der Rest des Vorrats aber nicht.
+    mitVorrat(
+        [
+            vorratArtikel('Bier', label: 'Getränke', position: 0),
+            vorratArtikel('Äpfel', label: 'Obst & Gemüse', position: 1),
+        ],
+        [mealieArtikel('bier')],
+    );
 
     $screen = Native::visit('/vorrat')->toggle('laden-getraenkemarkt', true);
 
@@ -299,8 +370,11 @@ it('zeigt im Vorrat einen eigenen Leerzustand, wenn für den Laden alles auf der
     expect(ladenChips($screen))->toHaveCount(4);
 });
 
-it('lässt die Chips im Vorrat weg, wenn der ganze Katalog auf der Liste steht', function () {
-    aufDieListeFuerLaeden(...app(Katalog::class)->artikelIds());
+it('lässt die Chips im Vorrat weg, wenn der ganze Vorrat auf der Liste steht', function () {
+    mitVorrat(
+        [vorratArtikel('Äpfel', label: 'Obst & Gemüse')],
+        [mealieArtikel('äpfel')],
+    );
 
     $screen = Native::visit('/vorrat');
 
@@ -310,37 +384,38 @@ it('lässt die Chips im Vorrat weg, wenn der ganze Katalog auf der Liste steht',
 
 /*
  * Die Aufteilung selbst. Geprüft wird nicht, welcher Artikel wohin gehört —
- * das ist eine Frage des Einkaufens und steht in der Konfiguration —, sondern
- * dass die Aufteilung überhaupt trennt. Ohne diese Regel wandert beim Pflegen
- * schleichend alles zu „Lidl und Rewe" zurück, und die Chips filtern nichts
- * mehr.
+ * das steht seit dem Umzug in Mealie —, sondern dass die Warengruppen
+ * überhaupt trennen. Ohne diese Regel wandert beim Pflegen schleichend alles
+ * zu „Lidl und Rewe“ zurück, und die Chips filtern nichts mehr.
  */
 
-it('ordnet jeden Katalog-Artikel genau einem Laden zu', function () {
+it('ordnet jede Warengruppe genau einem Laden zu', function () {
     $mehrdeutig = [];
 
     foreach (app(Katalog::class)->gruppen() as $gruppe) {
-        foreach ($gruppe->artikel as $artikel) {
-            if (count($artikel->laeden) !== 1) {
-                $mehrdeutig[$artikel->id] = array_map(fn (Laden $laden) => $laden->value, $artikel->laeden);
-            }
+        if (count($gruppe->laeden) !== 1) {
+            $mehrdeutig[$gruppe->id] = array_map(fn (Laden $laden) => $laden->value, $gruppe->laeden);
         }
     }
 
     expect($mehrdeutig)->toBe([]);
 });
 
-it('deckt mit den drei Läden zusammen den ganzen Katalog ab', function () {
-    $katalog = app(Katalog::class);
-    $alle = $katalog->artikelIds();
+it('deckt mit den drei Läden zusammen alle Warengruppen ab', function () {
+    $gruppen = app(Katalog::class)->gruppen();
 
-    $verteilt = array_merge(...array_map(
-        fn (Laden $laden) => $katalog->imLaden($alle, $laden),
+    $abgedeckt = array_values(array_unique(array_merge(...array_map(
+        fn (Laden $laden) => array_map(
+            fn ($gruppe) => $gruppe->id,
+            array_filter($gruppen, fn ($gruppe) => in_array($laden, $gruppe->laeden, strict: true)),
+        ),
         Laden::alle(),
-    ));
+    ))));
+
+    $alle = array_map(fn ($gruppe) => $gruppe->id, $gruppen);
 
     sort($alle);
-    sort($verteilt);
+    sort($abgedeckt);
 
-    expect($verteilt)->toBe($alle);
+    expect($abgedeckt)->toBe($alle);
 });

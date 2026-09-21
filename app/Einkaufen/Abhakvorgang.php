@@ -3,29 +3,24 @@
 namespace App\Einkaufen;
 
 /**
- * Ein „Alles abhaken“, das sich noch zurücknehmen lässt: welche eigenen
- * Artikel dabei von der Liste geräumt wurden und welche Mealie-Artikel den
- * Haken bekommen haben.
+ * Ein „Alles abhaken“, das sich noch zurücknehmen lässt: welche Artikel
+ * dabei den Haken bekommen haben.
  *
- * Von den Mealie-Artikeln liegt hier Mealies eigene Darstellung — dieselbe,
- * die beim Zurückholen wieder zum Server geht. Sie ist absichtlich nicht
- * unveränderlich: nimmt Mealie das Abhaken nicht an, fällt die Mealie-Hälfte
- * weg und die Leiste zählt nur noch die eigenen Artikel.
+ * Von den Artikeln liegt hier Mealies eigene Darstellung — dieselbe, die
+ * beim Zurückholen wieder zum Server geht. Sie ist absichtlich nicht
+ * unveränderlich: nimmt Mealie das Abhaken nicht an, bleibt nichts übrig,
+ * was sich zurücknehmen ließe, und die Leiste verschwindet.
  */
 final class Abhakvorgang
 {
     /**
-     * @param  list<string>  $eigeneIds
-     * @param  list<array<string, mixed>>  $mealieArtikel  Mealies Darstellung der Artikel
+     * @param  list<array<string, mixed>>  $artikel  Mealies Darstellung der Artikel
      */
-    public function __construct(
-        private readonly array $eigeneIds,
-        private array $mealieArtikel = [],
-    ) {}
+    public function __construct(private array $artikel = []) {}
 
     public function anzahl(): int
     {
-        return count($this->eigeneIds) + count($this->mealieArtikel);
+        return count($this->artikel);
     }
 
     /** Nichts mehr zurückzunehmen — dann gehört auch keine Leiste mehr hin. */
@@ -43,19 +38,11 @@ final class Abhakvorgang
     }
 
     /**
-     * @return list<string>
-     */
-    public function eigeneIds(): array
-    {
-        return $this->eigeneIds;
-    }
-
-    /**
      * @return list<array<string, mixed>>
      */
-    public function mealieArtikel(): array
+    public function artikel(): array
     {
-        return $this->mealieArtikel;
+        return $this->artikel;
     }
 
     /**
@@ -63,8 +50,8 @@ final class Abhakvorgang
      * der Liste und gehören damit nicht mehr zu dem, was sich zurücknehmen
      * lässt.
      */
-    public function mealieVergessen(): void
+    public function vergessen(): void
     {
-        $this->mealieArtikel = [];
+        $this->artikel = [];
     }
 }

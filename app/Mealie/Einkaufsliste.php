@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Http;
 final class Einkaufsliste
 {
     /**
-     * @return array{artikel: list<array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>}>}|array{fehler: string}
+     * @return array{artikel: list<array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>, laeden: list<string>}>}|array{fehler: string}
      */
     public static function laden(string $basisUrl, string $token, string $listenId, int $timeout): array
     {
@@ -52,6 +52,19 @@ final class Einkaufsliste
     }
 
     /**
+     * Ein einzelner Artikel in der flachen Form der App — für den, den Mealie
+     * gerade frisch angelegt hat. Rezeptnamen braucht er keine: ein von Hand
+     * hinzugefügter Artikel gehört zu keinem Rezept.
+     *
+     * @param  array<string, mixed>  $eintrag
+     * @return array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>, laeden: list<string>}
+     */
+    public static function ausRohdaten(array $eintrag): array
+    {
+        return self::eintrag($eintrag, []);
+    }
+
+    /**
      * Mealies eigene Reihenfolge: erst `position`, dann der Erstellzeitpunkt.
      * Beide Felder können fehlen und sind dann 0 bzw. leer — das hält die
      * Eingangsreihenfolge, statt sie zu würfeln.
@@ -70,7 +83,7 @@ final class Einkaufsliste
     /**
      * @param  array<string, mixed>  $eintrag
      * @param  array<string, string>  $rezeptnamen
-     * @return array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>}
+     * @return array{id: string, text: string, notiz: ?string, label: ?string, rezepte: list<string>, abgehakt: bool, roh: array<string, mixed>, laeden: list<string>}
      */
     private static function eintrag(array $eintrag, array $rezeptnamen): array
     {
@@ -91,7 +104,29 @@ final class Einkaufsliste
             'rezepte' => $rezepte,
             'abgehakt' => (bool) ($eintrag['checked'] ?? false),
             'roh' => $eintrag,
+            'laeden' => self::laeden($eintrag),
         ];
+    }
+
+    /**
+     * Die Läden aus `extras.laeden` — sie kommen an einen Artikel, wenn er
+     * aus dem Vorrat kopiert wurde und dort eine Ausnahme stand. Mealies
+     * Extras halten nur flache Zeichenketten, mehrere Läden stehen deshalb
+     * kommagetrennt.
+     *
+     * @param  array<string, mixed>  $eintrag
+     * @return list<string>
+     */
+    private static function laeden(array $eintrag): array
+    {
+        $extras = is_array($eintrag['extras'] ?? null) ? $eintrag['extras'] : [];
+        $laeden = trim((string) ($extras['laeden'] ?? ''));
+
+        if ($laeden === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(trim(...), explode(',', $laeden))));
     }
 
     /**

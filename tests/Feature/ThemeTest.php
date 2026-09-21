@@ -2,7 +2,6 @@
 
 use App\Erscheinungsbild\Akzentfarbe;
 use App\Erscheinungsbild\Farbwahl;
-use App\Liste\EigeneListe;
 use Native\Mobile\Testing\Native;
 use Native\Mobile\UI\Theme;
 
@@ -33,7 +32,10 @@ it('schickt zu jeder Farbe eine davon verschiedene Dark-Mode-Entsprechung mit', 
  * durch — hell wie dunkel, ohne zweite Farbe, die gepflegt werden müsste.
  */
 it('lässt die Luft am Listenende farblos und leer', function (string $uri) {
-    app(EigeneListe::class)->hinzufuegen('tofu');
+    mitVorrat(
+        [vorratArtikel('Tofu', label: 'Kühlregal', lebensmittel: 'Tofu')],
+        [mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')],
+    );
 
     $luft = listenLuft(Native::visit($uri, platform: 'android'));
 
@@ -43,7 +45,7 @@ it('lässt die Luft am Listenende farblos und leer', function (string $uri) {
 })->with(['/', '/vorrat']);
 
 it('färbt auch die Leiste nach „Alles abhaken“ in beiden Erscheinungsbildern', function () {
-    app(EigeneListe::class)->hinzufuegen('tofu');
+    mitMealie([mealieArtikel('1 Kopf Brokkoli', label: 'Gemüse')]);
 
     $screen = Native::visit('/', platform: 'android')->press('alleAbhaken');
 

@@ -11,7 +11,6 @@ use App\Icons\Android;
 use App\Icons\Ios;
 use App\Katalog\Laden;
 use App\Katalog\Ladenfilter;
-use App\Liste\EigeneListe;
 use App\Mealie\Artikelstatus;
 use App\Mealie\Einkaufsliste;
 use App\Mealie\Eintrag;
@@ -43,10 +42,9 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Die Anzahl der offenen Artikel auf diesem Screen — eigene plus die
-     * nicht abgehakten aus Mealie. Filtert gerade ein Laden, steht daneben,
-     * wie viele es ohne ihn wären: sonst sähe eine halbe Liste aus wie die
-     * ganze.
+     * Die Anzahl der offenen Artikel auf diesem Screen. Filtert gerade ein
+     * Laden, steht daneben, wie viele es ohne ihn wären: sonst sähe eine
+     * halbe Liste aus wie die ganze.
      */
     public function navSubtitle(): ?string
     {
@@ -64,8 +62,8 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Beim Öffnen des Tabs liegt die eigene Liste sofort da; Mealie kommt
-     * nach, sobald die Antwort da ist.
+     * Beim Öffnen des Tabs steht die Liste aus dem Cache sofort da; Mealie
+     * kommt nach, sobald die Antwort da ist.
      */
     public function mount(): void
     {
@@ -120,8 +118,7 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Rechts in der Top-Bar: „Alles abhaken“, solange irgendetwas offen ist —
-     * eigene Artikel oder offene Mealie-Artikel —,
+     * Rechts in der Top-Bar: „Alles abhaken“, solange irgendetwas offen ist,
      * und das Zahnrad — der einzige Weg zu den Einstellungen, der von überall
      * erreichbar ist.
      */
@@ -191,8 +188,8 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Was auf der Liste steht — eigene Artikel und offene Mealie-Artikel,
-     * gruppiert nach Warengruppe.
+     * Was auf der Liste steht — die offenen Artikel, gruppiert nach
+     * Warengruppe.
      *
      * @return list<Abschnitt>
      */
@@ -234,15 +231,6 @@ class Einkaufen extends Screen
         $this->leisteVerwerfen();
 
         app(Sitzung::class)->abgehakteUmklappen();
-    }
-
-    public function abhaken(string $artikelId): void
-    {
-        $this->leisteVerwerfen();
-
-        $this->liste()->entfernen($artikelId);
-
-        unset($this->abschnitte);
     }
 
     /**
@@ -299,44 +287,30 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Ein Tap, und die Liste ist leer: eigene Artikel zurück in den Vorrat,
-     * offene Mealie-Artikel abgehakt. Keine Nachfrage — der Fehlgriff kostet
-     * nichts, weil unten die Leiste stehen bleibt, die ihn zurücknimmt.
+     * Ein Tap, und die Liste ist leer: alle offenen Artikel bekommen ihren
+     * Haken. Keine Nachfrage — der Fehlgriff kostet nichts, weil unten die
+     * Leiste stehen bleibt, die ihn zurücknimmt.
      */
     public function alleAbhaken(): void
     {
-        $eigeneIds = $this->uebersicht()->eigeneIds();
-        $mealie = $this->mealieZumAbhaken();
+        $artikel = $this->mealieZumAbhaken();
 
-        if ($eigeneIds === [] && $mealie === []) {
+        if ($artikel === []) {
             return;
         }
 
-        // Ohne Filter räumt `alleEntfernen()` die Tabelle leer und wird dabei
-        // auch die IDs los, die der Katalog nicht mehr kennt. Mit Filter darf
-        // nur weg, was gerade dasteht — sonst hakt ein Tap Artikel ab, die
-        // der Screen gar nicht zeigt.
-        if ($this->gewaehlterLaden() === null) {
-            $this->liste()->alleEntfernen();
-        } else {
-            foreach ($eigeneIds as $artikelId) {
-                $this->liste()->entfernen($artikelId);
-            }
-        }
-
-        $vorgang = new Abhakvorgang($eigeneIds, array_map(fn (Eintrag $eintrag) => $eintrag->roh, $mealie));
+        $vorgang = new Abhakvorgang(array_map(fn (Eintrag $eintrag) => $eintrag->roh, $artikel));
 
         app(Rueckgaengig::class)->merken($vorgang);
 
-        $this->mealieAlleAbhaken($mealie, $vorgang);
+        $this->mealieAlleAbhaken($artikel, $vorgang);
 
         $this->listeNeuZeichnen();
     }
 
     /**
-     * Der Weg zurück: genau die Artikel dieses Vorgangs kommen wieder, die
-     * eigenen in ihre alten Warengruppen, die Mealie-Artikel in einem
-     * einzigen Bulk-Update auf „offen“.
+     * Der Weg zurück: genau die Artikel dieses Vorgangs kommen wieder — in
+     * einem einzigen Bulk-Update auf „offen“.
      */
     public function rueckgaengigMachen(): void
     {
@@ -348,11 +322,7 @@ class Einkaufen extends Screen
 
         $this->leisteVerwerfen();
 
-        foreach ($vorgang->eigeneIds() as $artikelId) {
-            $this->liste()->hinzufuegen($artikelId);
-        }
-
-        $this->mealieZurueckholen($vorgang->mealieArtikel());
+        $this->mealieZurueckholen($vorgang->artikel());
 
         $this->listeNeuZeichnen();
     }
@@ -364,10 +334,10 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Die offenen Mealie-Artikel, die „Alles abhaken“ mitnimmt — die, die
-     * gerade dastehen. Leer, solange das Banner steht oder kein Token
-     * hinterlegt ist: dann kann die App Mealie nichts melden und zählt es in
-     * der Leiste auch nicht mit.
+     * Die offenen Artikel, die „Alles abhaken“ mitnimmt — die, die gerade
+     * dastehen. Leer, solange das Banner steht oder kein Token hinterlegt
+     * ist: dann kann die App Mealie nichts melden und zählt es in der Leiste
+     * auch nicht mit.
      *
      * @return list<Eintrag>
      */
@@ -381,9 +351,9 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Hakt alle offenen Mealie-Artikel in einem Zug ab: erst auf dem Screen,
-     * dann — in einem einzigen Bulk-Update — in Mealie. Lehnt Mealie ab,
-     * kehren sie in ihre Gruppen zurück und fallen aus dem Vorgang heraus.
+     * Hakt alle offenen Artikel in einem Zug ab: erst auf dem Screen, dann —
+     * in einem einzigen Bulk-Update — in Mealie. Lehnt Mealie ab, kehren sie
+     * in ihre Gruppen zurück und die Leiste verschwindet.
      *
      * @param  list<Eintrag>  $eintraege
      */
@@ -419,8 +389,7 @@ class Einkaufen extends Screen
 
     /**
      * Mealie hat das Bulk-Update nicht angenommen: die Artikel kehren in ihre
-     * Gruppen zurück. Die eigenen Artikel bleiben entfernt — die hat Mealie
-     * nie etwas angegangen —, und die Leiste zählt nur noch sie.
+     * Gruppen zurück, und mit dem leeren Vorgang verschwindet die Leiste.
      *
      * @param  list<string>  $ids
      */
@@ -428,7 +397,7 @@ class Einkaufen extends Screen
     {
         app(Sitzung::class)->hakenMehrere($ids, false);
 
-        $vorgang->mealieVergessen();
+        $vorgang->vergessen();
 
         $this->listeNeuZeichnen();
 
@@ -436,9 +405,9 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Setzt die Mealie-Artikel eines zurückgenommenen Vorgangs in einem Zug
-     * wieder auf „offen“. Ohne Token bleibt es bei den eigenen Artikeln —
-     * dann ist beim Abhaken ohnehin nichts an Mealie gegangen.
+     * Setzt die Artikel eines zurückgenommenen Vorgangs in einem Zug wieder
+     * auf „offen“. Ohne Token passiert nichts — dann ist beim Abhaken
+     * ohnehin nichts an Mealie gegangen.
      *
      * @param  list<array<string, mixed>>  $artikel  Mealies Darstellung der Artikel
      */
@@ -472,8 +441,8 @@ class Einkaufen extends Screen
     }
 
     /**
-     * Mealie hat das Zurückholen nicht angenommen: die Mealie-Artikel bleiben
-     * abgehakt. Die eigenen Artikel stehen trotzdem wieder auf der Liste.
+     * Mealie hat das Zurückholen nicht angenommen: die Artikel bleiben
+     * abgehakt.
      *
      * @param  list<string>  $ids
      */
@@ -504,8 +473,8 @@ class Einkaufen extends Screen
      * wird weder geladen noch zum Verbinden aufgefordert.
      *
      * Der Aufruf läuft über `async`, weil der Runloop erst nach dem Handler
-     * wieder rendert — synchron bliebe die Ladezeile unsichtbar und die
-     * eigene Liste hinge, bis Mealie antwortet.
+     * wieder rendert — synchron bliebe die Ladezeile unsichtbar und der
+     * Screen hinge, bis Mealie antwortet.
      */
     private function mealieLaden(): void
     {
@@ -589,11 +558,6 @@ class Einkaufen extends Screen
     private function leisteVerwerfen(): void
     {
         app(Rueckgaengig::class)->verwerfen();
-    }
-
-    private function liste(): EigeneListe
-    {
-        return app(EigeneListe::class);
     }
 
     private function uebersicht(): Uebersicht

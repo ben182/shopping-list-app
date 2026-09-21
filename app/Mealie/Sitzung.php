@@ -109,6 +109,48 @@ final class Sitzung
         $this->cache->aktualisieren($this->daten());
     }
 
+    /**
+     * Hängt einen Artikel an die Liste, bevor Mealie ihn kennt: der Tap im
+     * Vorrat soll sofort auf der Einkaufsliste stehen. Die ID ist bis zur
+     * Antwort eine vorläufige, mit der die App den Artikel wiederfindet.
+     *
+     * @param  array{id?: string, text?: string, notiz?: ?string, label?: ?string, rezepte?: list<string>, abgehakt?: bool, roh?: array<string, mixed>, laeden?: list<string>}  $daten
+     */
+    public function einfuegen(array $daten): void
+    {
+        $this->eintraege = [...$this->alle(), Eintrag::ausDaten($daten)];
+
+        $this->cache->aktualisieren($this->daten());
+    }
+
+    /**
+     * Ersetzt einen vorläufig eingefügten Artikel durch den, den Mealie
+     * angelegt hat — erst danach trägt er eine ID, unter der Mealie ihn
+     * abhaken lässt.
+     *
+     * @param  array{id?: string, text?: string, notiz?: ?string, label?: ?string, rezepte?: list<string>, abgehakt?: bool, roh?: array<string, mixed>, laeden?: list<string>}  $daten
+     */
+    public function ersetzen(string $id, array $daten): void
+    {
+        $this->eintraege = array_map(
+            fn (Eintrag $eintrag) => $eintrag->id === $id ? Eintrag::ausDaten($daten) : $eintrag,
+            $this->alle(),
+        );
+
+        $this->cache->aktualisieren($this->daten());
+    }
+
+    /** Nimmt einen Artikel wieder heraus — Mealie hat ihn nicht angenommen. */
+    public function entfernen(string $id): void
+    {
+        $this->eintraege = array_values(array_filter(
+            $this->alle(),
+            fn (Eintrag $eintrag) => $eintrag->id !== $id,
+        ));
+
+        $this->cache->aktualisieren($this->daten());
+    }
+
     public function abgehakteAufgeklappt(): bool
     {
         return $this->abgehakteAufgeklappt;

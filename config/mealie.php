@@ -22,6 +22,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Vorratsliste
+    |--------------------------------------------------------------------------
+    |
+    | Eine zweite Mealie-Einkaufsliste, die nicht eingekauft, sondern gepflegt
+    | wird: die Artikel, die man immer im Haus haben will. Sie ist der Katalog
+    | des Vorrat-Screens — ein Tap dort kopiert den Artikel in die
+    | Einkaufsliste oben, der Vorratseintrag bleibt stehen.
+    |
+    | Gepflegt wird sie in Mealie, von allen im Haushalt.
+    |
+    */
+
+    'vorrat_liste_id' => env('MEALIE_VORRAT_LIST_ID') ?: '00000000-0000-4000-8000-000000000001',
+
+    /*
+    |--------------------------------------------------------------------------
     | Timeout
     |--------------------------------------------------------------------------
     |

@@ -3,9 +3,12 @@
 namespace App\Katalog;
 
 /**
- * Die feste Artikelliste der App, gelesen aus `config/katalog.php`. Der
- * Katalog ist zur Laufzeit unveränderlich; er bestimmt überall die
- * Anzeigereihenfolge von Gruppen und Artikeln.
+ * Die Warengruppen der App, gelesen aus `config/katalog.php`. Sie sind zur
+ * Laufzeit unveränderlich und bestimmen überall die Reihenfolge der
+ * Überschriften — den Weg durch den Laden.
+ *
+ * Was in den Gruppen steht, kommt aus Mealie; der Katalog kennt nur ihre
+ * Namen und die Läden, die seine Artikel von ihnen erben.
  */
 final class Katalog
 {
@@ -13,99 +16,21 @@ final class Katalog
     private ?array $gruppen = null;
 
     /**
-     * Alle Gruppen mit allen ihren Artikeln, in Katalogreihenfolge.
+     * Alle Warengruppen in Anzeigereihenfolge.
      *
      * @return list<Gruppe>
      */
     public function gruppen(): array
     {
         return $this->gruppen ??= array_values(array_map(
-            fn (string $gruppeId, array $gruppe) => self::gruppe($gruppeId, $gruppe),
+            fn (string $gruppeId, array $gruppe) => new Gruppe(
+                id: $gruppeId,
+                name: $gruppe['name'],
+                laeden: Laden::ausSchluesseln($gruppe['laeden'] ?? []),
+            ),
             array_keys($katalog = config('katalog.gruppen')),
             $katalog,
         ));
-    }
-
-    /**
-     * Alle Artikel-IDs in Katalogreihenfolge.
-     *
-     * @return list<string>
-     */
-    public function artikelIds(): array
-    {
-        $ids = [];
-
-        foreach ($this->gruppen() as $gruppe) {
-            foreach ($gruppe->artikel as $artikel) {
-                $ids[] = $artikel->id;
-            }
-        }
-
-        return $ids;
-    }
-
-    public function kennt(string $artikelId): bool
-    {
-        return in_array($artikelId, $this->artikelIds(), strict: true);
-    }
-
-    /**
-     * Aus den übergebenen IDs die, deren Artikelname den Suchbegriff enthält —
-     * ohne Rücksicht auf Groß-/Kleinschreibung. Leerraum am Anfang und Ende des
-     * Begriffs zählt nicht mit, ein leerer Begriff lässt alles durch. Die
-     * Reihenfolge ist wieder die des Katalogs, nicht die der Eingabe.
-     *
-     * @param  list<string>  $artikelIds
-     * @return list<string>
-     */
-    public function gefiltert(array $artikelIds, string $suchbegriff): array
-    {
-        $begriff = trim($suchbegriff);
-
-        if ($begriff === '') {
-            return $artikelIds;
-        }
-
-        $gesucht = array_flip($artikelIds);
-        $treffer = [];
-
-        foreach ($this->gruppen() as $gruppe) {
-            foreach ($gruppe->artikel as $artikel) {
-                if (isset($gesucht[$artikel->id]) && mb_stripos($artikel->name, $begriff) !== false) {
-                    $treffer[] = $artikel->id;
-                }
-            }
-        }
-
-        return $treffer;
-    }
-
-    /**
-     * Aus den übergebenen IDs die, die es im gewählten Laden gibt. Ohne Laden
-     * — der Filter steht auf „Alle“ — bleibt die Liste, wie sie war. Die
-     * Reihenfolge ist die des Katalogs.
-     *
-     * @param  list<string>  $artikelIds
-     * @return list<string>
-     */
-    public function imLaden(array $artikelIds, ?Laden $laden): array
-    {
-        if ($laden === null) {
-            return $artikelIds;
-        }
-
-        $gesucht = array_flip($artikelIds);
-        $treffer = [];
-
-        foreach ($this->gruppen() as $gruppe) {
-            foreach ($gruppe->artikel as $artikel) {
-                if (isset($gesucht[$artikel->id]) && $artikel->gibtEsIn($laden)) {
-                    $treffer[] = $artikel->id;
-                }
-            }
-        }
-
-        return $treffer;
     }
 
     /**
@@ -124,59 +49,38 @@ final class Katalog
     }
 
     /**
-     * Die übergebenen Artikel, gruppiert und in Katalogreihenfolge sortiert.
-     * IDs ohne Katalog-Eintrag fallen weg, ebenso Gruppen, von denen dabei
-     * nichts übrig bleibt.
+     * Die übergebenen Gruppennamen in Anzeigereihenfolge: erst die
+     * Warengruppen des Katalogs in seiner Reihenfolge, danach die
+     * Überschriften, die nur aus einem Mealie-Label entstanden sind,
+     * alphabetisch.
      *
-     * @param  list<string>  $artikelIds
-     * @return list<Gruppe>
+     * @param  list<string>  $namen
+     * @return list<string>
      */
-    public function gruppiert(array $artikelIds): array
+    public function reihenfolge(array $namen): array
     {
-        $gesucht = array_flip($artikelIds);
-        $gefuellt = [];
+        $katalogNamen = array_map(fn (Gruppe $gruppe) => $gruppe->name, $this->gruppen());
 
-        foreach ($this->gruppen() as $gruppe) {
-            $artikel = array_values(array_filter(
-                $gruppe->artikel,
-                fn (Artikel $artikel) => isset($gesucht[$artikel->id]),
-            ));
+        $ausKatalog = array_values(array_filter($katalogNamen, fn (string $name) => in_array($name, $namen, strict: true)));
+        $zusaetzlich = array_values(array_diff($namen, $katalogNamen));
 
-            if ($artikel !== []) {
-                $gefuellt[] = new Gruppe($gruppe->id, $gruppe->name, $artikel, $gruppe->laeden);
-            }
-        }
+        usort($zusaetzlich, fn (string $a, string $b) => strcasecmp(self::sortierbar($a), self::sortierbar($b)));
 
-        return $gefuellt;
+        return [...$ausKatalog, ...$zusaetzlich];
     }
 
     /**
-     * Baut eine Gruppe aus ihrem Konfigurationsblock. Ein Artikel steht dort
-     * entweder als blanker Anzeigename — dann erbt er die Läden seiner
-     * Gruppe — oder als Array mit eigenem `laeden`-Schlüssel.
-     *
-     * @param  array{name: string, laeden?: list<string>, artikel: array<string, string|array{name: string, laeden?: list<string>}>}  $daten
+     * Umlaute sortieren wie ihre Grundbuchstaben — „Öl“ gehört zwischen
+     * „Obst“ und „Pasta“, nicht hinter „Zucker“, wo ein reiner Byte-Vergleich
+     * es ablegen würde. Ein `Collator` wäre genauer, steht aber in der
+     * PHP-Runtime des Geräts nicht sicher zur Verfügung.
      */
-    private static function gruppe(string $gruppeId, array $daten): Gruppe
+    private static function sortierbar(string $name): string
     {
-        $laeden = Laden::ausSchluesseln($daten['laeden'] ?? []);
-
-        return new Gruppe(
-            id: $gruppeId,
-            name: $daten['name'],
-            artikel: array_values(array_map(
-                fn (string $artikelId, string|array $artikel) => new Artikel(
-                    id: $artikelId,
-                    name: is_array($artikel) ? $artikel['name'] : $artikel,
-                    gruppeId: $gruppeId,
-                    laeden: is_array($artikel) && isset($artikel['laeden'])
-                        ? Laden::ausSchluesseln($artikel['laeden'])
-                        : $laeden,
-                ),
-                array_keys($daten['artikel']),
-                $daten['artikel'],
-            )),
-            laeden: $laeden,
+        return str_replace(
+            ['ä', 'ö', 'ü', 'Ä', 'Ö', 'Ü', 'ß'],
+            ['a', 'o', 'u', 'A', 'O', 'U', 'ss'],
+            $name,
         );
     }
 }

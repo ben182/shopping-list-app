@@ -88,12 +88,14 @@
                 {{-- Die Überschrift hängt am Abschnitt: fällt der Abschnitt weg, fällt sie mit. --}}
                 <native:list-section header="{{ $abschnitt->name }}">
                     @foreach ($abschnitt->zeilen as $zeile)
-                        @if ($zeile->ausMealie)
-                            @php($umschalten = "mealieUmschalten('{$zeile->id}')")
-                            {{-- Das Besteck-Icon bleibt ohne eigene Farbe: die Renderer
-                                 zeichnen ein Trailing-Icon von sich aus in der gedämpften
-                                 Sekundärfarbe, und eine feste Farbe hier hätte keine
-                                 Dark-Mode-Entsprechung. --}}
+                        @php($umschalten = "mealieUmschalten('{$zeile->id}')")
+                        {{-- Das Besteck-Icon sagt „das wollte ein Rezept“ und bleibt ohne
+                             eigene Farbe: die Renderer zeichnen ein Trailing-Icon von sich
+                             aus in der gedämpften Sekundärfarbe, und eine feste Farbe hier
+                             hätte keine Dark-Mode-Entsprechung. Zwei Zeilen statt einer mit
+                             bedingtem Icon: ein `@if` in der Attributliste eines
+                             `native:`-Tags zerlegt der Precompiler. --}}
+                        @if ($zeile->ausRezept)
                             <native:list-item
                                 native:key="{{ $zeile->id }}"
                                 ref="mealie-{{ $zeile->id }}"
@@ -103,22 +105,20 @@
                                 :disabled="$banner !== null"
                                 :trailingIconIos="Ios::ForkKnife"
                                 :trailingIconAndroid="Android::Restaurant"
-                                trailing-a11y-label="aus Mealie"
+                                trailing-a11y-label="aus einem Rezept"
                                 @press="{{ $umschalten }}"
                                 on-leading-change="{{ $umschalten }}"
                             />
                         @else
-                            {{-- Der Handler-Aufruf steht in einer Variablen, weil ein Argument in
-                                 Anführungszeichen direkt im Attribut den Callback-Parser von
-                                 `native:validate` aus dem Tritt bringt. --}}
-                            @php($abhaken = "abhaken('{$zeile->id}')")
                             <native:list-item
                                 native:key="{{ $zeile->id }}"
-                                ref="einkaufen-{{ $zeile->id }}"
+                                ref="mealie-{{ $zeile->id }}"
                                 headline="{{ $zeile->text }}"
+                                :supporting="$zeile->notiz ?? ''"
                                 :leadingCheckbox="false"
-                                @press="{{ $abhaken }}"
-                                on-leading-change="{{ $abhaken }}"
+                                :disabled="$banner !== null"
+                                @press="{{ $umschalten }}"
+                                on-leading-change="{{ $umschalten }}"
                             />
                         @endif
                     @endforeach

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Einkaufen\Rueckgaengig;
 use App\Katalog\Ladenfilter;
 use App\Mealie\Sitzung;
+use App\Vorrat\Sitzung as Vorratssitzung;
 use App\Wochenplan\Sitzung as Wochenplansitzung;
 use Illuminate\Support\ServiceProvider;
 
@@ -19,6 +20,10 @@ class AppServiceProvider extends ServiceProvider
         // jeder Tab-Wechsel mountet den Einkaufen-Screen neu, und was einmal
         // geladen wurde, soll dabei stehen bleiben.
         $this->app->singleton(Sitzung::class);
+
+        // Und für den Vorrat: er kommt aus Mealie wie die Einkaufsliste und
+        // soll den Tab-Wechsel genauso überstehen.
+        $this->app->singleton(Vorratssitzung::class);
 
         // Dasselbe für den Wochenplan: eine geladene Woche soll beim
         // Tab-Wechsel nicht wieder hinter einem Spinner verschwinden.

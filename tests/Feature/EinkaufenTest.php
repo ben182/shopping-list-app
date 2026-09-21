@@ -1,31 +1,40 @@
 <?php
 
-use App\Liste\EigeneListe;
 use Ben182\AppLifecycle\Events\AppForegrounded;
+use Illuminate\Support\Facades\Http;
 use Native\Mobile\Testing\Native;
 
 /*
- * Die Erwartungswerte stammen aus Anhang A der PRD, nicht aus der
- * Konfiguration — sonst prüfte der Test die Konfiguration gegen sich selbst.
+ * Der Einkaufen-Screen zeigt seit dem Umzug des Vorrats nach Mealie nur noch
+ * eine Quelle: die Mealie-Einkaufsliste. Die Vorbedingung jedes Tests ist
+ * deshalb eine gefakte Liste, nicht mehr ein Eintrag in der Gerätedatenbank.
  */
 
 /**
- * Setzt Artikel über dieselbe Fachklasse auf die Liste, die der Vorrat
- * benutzt — die Vorbedingung des Tests, nicht sein Prüfgegenstand.
+ * Die Artikel, mit denen diese Geschichte anfängt — in Mealies Darstellung
+ * und mit den Labels, unter denen sie in ihre Warengruppen fallen.
+ *
+ * @return list<array<string, mixed>>
  */
-function aufDieListe(string ...$artikelIds): void
+function artikelAufDerListe(): array
 {
-    foreach ($artikelIds as $artikelId) {
-        app(EigeneListe::class)->hinzufuegen($artikelId);
-    }
+    return [
+        mealieArtikel('Tofu', label: 'Fleischprodukte', position: 0, id: 'tofu-1'),
+        mealieArtikel('Hummus', label: 'Milchprodukte', position: 1, id: 'hummus-1'),
+        mealieArtikel('Salz', label: 'Gewürze', position: 2, id: 'salz-1'),
+    ];
 }
 
 it('gruppiert die Artikel auf der Liste in Katalogreihenfolge und blendet leere Gruppen aus', function () {
-    aufDieListe('salz', 'aepfel', 'bananen', 'brot', 'wasser-still');
+    mitMealie([
+        mealieArtikel('Salz', label: 'Gewürze', position: 0),
+        mealieArtikel('Äpfel', label: 'Obst & Gemüse', position: 1),
+        mealieArtikel('Bananen', label: 'Obst & Gemüse', position: 2),
+        mealieArtikel('Brot', label: 'Backwaren', position: 3),
+        mealieArtikel('Wasser (still)', label: 'Getränke', position: 4),
+    ]);
 
-    $abschnitte = listenAbschnitte(Native::visit('/'));
-
-    expect($abschnitte)->toBe([
+    expect(listenAbschnitte(Native::visit('/')))->toBe([
         ['ueberschrift' => 'Obst & Gemüse', 'artikel' => ['Äpfel', 'Bananen']],
         ['ueberschrift' => 'Brot & Backwaren', 'artikel' => ['Brot']],
         ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
@@ -34,7 +43,7 @@ it('gruppiert die Artikel auf der Liste in Katalogreihenfolge und blendet leere 
 });
 
 it('zeigt jeden Artikel als Zeile mit leerer Checkbox vorn', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     Native::visit('/')
         ->assertElement('list_item', fn (array $node) => ($node['props']['headline'] ?? null) === 'Tofu'
@@ -43,62 +52,66 @@ it('zeigt jeden Artikel als Zeile mit leerer Checkbox vorn', function () {
             && ($node['on_press'] ?? null) !== null);
 });
 
-it('schickt einen angetippten Artikel sofort zurück in den Vorrat', function () {
-    aufDieListe('tofu', 'hummus');
+it('hakt einen angetippten Artikel ab und nimmt ihn aus seiner Warengruppe', function () {
+    mitMealie(artikelAufDerListe());
 
     $screen = Native::visit('/')->tap('Tofu');
 
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Hummus']]]);
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Hummus']],
+        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
+    ]);
 
-    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
-        ->firstWhere('ueberschrift', 'Kühlregal')['artikel'];
-
-    expect($vorrat)->toContain('Tofu')->not->toContain('Hummus');
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (1)']);
 });
 
-it('schickt einen Artikel auch dann zurück in den Vorrat, wenn nur seine Checkbox getroffen wird', function () {
-    aufDieListe('tofu', 'hummus');
+it('hakt einen Artikel auch dann ab, wenn nur seine Checkbox getroffen wird', function () {
+    mitMealie(artikelAufDerListe());
 
-    $screen = checkboxAntippen(Native::visit('/'), 'einkaufen-tofu');
+    $screen = checkboxAntippen(Native::visit('/'), 'mealie-tofu-1');
 
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Hummus']]]);
+    expect(listenAbschnitte($screen))->toBe([
+        ['ueberschrift' => 'Kühlregal', 'artikel' => ['Hummus']],
+        ['ueberschrift' => 'Lebensmittel', 'artikel' => ['Salz']],
+    ]);
 });
 
-it('zeigt einen im Vorrat hinzugefügten Artikel beim Tab-Wechsel an seiner Katalogposition', function () {
-    aufDieListe('bananen', 'kartoffeln');
+it('zeigt einen im Vorrat angetippten Artikel nach dem Tab-Wechsel auf der Liste', function () {
+    mitVorrat(
+        [vorratArtikel('Tomaten', label: 'Obst & Gemüse')],
+        [mealieArtikel('Bananen', label: 'Obst & Gemüse', position: 0)],
+    );
 
     // Derselbe Weg wie auf dem Gerät: im Vorrat antippen, dann unten auf den
     // Einkaufen-Tab — der Tab-Wechsel ersetzt den Root-Screen.
     $vorrat = Native::visit('/vorrat')->tap('Tomaten');
 
-    expect(collect(listenAbschnitte($vorrat))->firstWhere('ueberschrift', 'Obst & Gemüse')['artikel'])
-        ->not->toContain('Tomaten');
+    expect(vorratZeilen($vorrat))->toBe([]);
 
     $einkaufen = $vorrat
         ->tap('Einkaufen')
         ->assertReplacedWith('/')
         ->follow();
 
-    $obstUndGemuese = collect(listenAbschnitte($einkaufen))
-        ->firstWhere('ueberschrift', 'Obst & Gemüse')['artikel'];
-
-    // Katalogreihenfolge in Anhang A: … Bananen … Tomaten … Kartoffeln.
-    expect($obstUndGemuese)->toBe(['Bananen', 'Tomaten', 'Kartoffeln']);
+    expect(collect(listenAbschnitte($einkaufen))->firstWhere('ueberschrift', 'Obst & Gemüse')['artikel'])
+        ->toContain('Tomaten');
 });
 
 it('zählt im Untertitel die offenen Artikel', function () {
-    aufDieListe('tofu', 'hummus', 'salz');
+    mitMealie(artikelAufDerListe());
 
     expect(navUntertitel(Native::visit('/')))->toBe('3 Artikel');
 });
 
 it('zeigt keinen Untertitel, solange kein Artikel offen ist', function () {
+    mitMealie([]);
+
     expect(navUntertitel(Native::visit('/')))->toBeNull();
 });
 
 it('zeigt den Leerzustand, wenn nichts auf der Liste steht', function () {
+    mitMealie([]);
+
     Native::visit('/', platform: 'android')
         ->assertSee('Liste ist leer.')
         ->assertSee('Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.')
@@ -107,14 +120,11 @@ it('zeigt den Leerzustand, wenn nichts auf der Liste steht', function () {
 });
 
 it('kehrt zum Leerzustand zurück, sobald der letzte Artikel abgehakt ist', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     Native::visit('/')
         ->tap('Tofu')
-        ->assertSee('Liste ist leer.')
-        ->assertMissingElement('list_item');
-
-    expect(navUntertitel(Native::visit('/')))->toBeNull();
+        ->assertSee('Liste ist leer.');
 });
 
 /*
@@ -123,7 +133,7 @@ it('kehrt zum Leerzustand zurück, sobald der letzte Artikel abgehakt ist', func
  * Tab-Leiste — die letzte Zeile soll frei über ihr stehen.
  */
 it('lässt ohne den Block „Abgehakt“ am Listenende eine Zeilenhöhe Luft', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     $luft = listenLuft(Native::visit('/'));
 
@@ -132,11 +142,13 @@ it('lässt ohne den Block „Abgehakt“ am Listenende eine Zeilenhöhe Luft', f
 });
 
 it('zeigt im Leerzustand keine Luft', function () {
+    mitMealie([]);
+
     expect(knotenMitRef(Native::visit('/'), 'listenende'))->toBeNull();
 });
 
 it('rendert die Artikel in einer scrollbaren Liste innerhalb der nativen Chrome', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     // `native:list` ist der scrollende Container; die Tab-Leiste gehört zur
     // nativen Chrome, die ihre Höhe selbst als Inset an den Inhalt weitergibt.
@@ -147,48 +159,50 @@ it('rendert die Artikel in einer scrollbaren Liste innerhalb der nativen Chrome'
 });
 
 it('beschriftet auch die gefüllte Liste für Screenreader', function () {
-    aufDieListe('tofu', 'salz');
+    mitMealie(artikelAufDerListe());
 
     Native::visit('/', platform: 'android')->assertAccessible();
 });
 
-it('zeigt die Action „Alles abhaken“ nur, solange mindestens ein Artikel offen ist', function () {
-    Native::visit('/')->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
+it('lässt die Action „Alles abhaken“ weg, solange nichts offen ist', function () {
+    mitMealie([]);
 
-    aufDieListe('tofu');
+    Native::visit('/')->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
+});
+
+it('zeigt die Action „Alles abhaken“, sobald ein Artikel offen ist', function () {
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     Native::visit('/')->assertElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
 });
 
 it('hakt ohne Nachfrage sofort alles ab und stellt die Leiste zum Rückgängigmachen hin', function () {
-    aufDieListe('tofu', 'hummus', 'salz');
+    mitMealie(artikelAufDerListe());
 
     $screen = Native::visit('/')->press('alleAbhaken');
 
     $screen->assertNativeNotCalled('Dialog.Alert')
         ->assertSee('Liste ist leer.')
         ->assertSee('Tippe auf den Vorrat-Tab, um Artikel hinzuzufügen.')
-        ->assertMissingElement('list_item')
         ->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken');
 
     expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toBe(['3 Artikel abgehakt', 'Rückgängig']);
-
-    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
-        ->flatMap(fn (array $abschnitt) => $abschnitt['artikel']);
-
-    expect($vorrat)->toContain('Tofu', 'Hummus', 'Salz')->toHaveCount(112);
+    expect(abgehaktZeilen($screen))->toBe(['Abgehakt (3)']);
 });
 
 it('zählt im Leistentext den einen Artikel im Singular', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     $screen = Native::visit('/')->press('alleAbhaken');
 
     expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
 });
 
-it('holt mit „Rückgängig“ genau die eigenen Artikel in ihre Warengruppen zurück', function () {
-    aufDieListe('tofu', 'salz');
+it('holt mit „Rückgängig“ genau die Artikel in ihre Warengruppen zurück', function () {
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Fleischprodukte', position: 0),
+        mealieArtikel('Salz', label: 'Gewürze', position: 1),
+    ]);
 
     $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
 
@@ -198,15 +212,10 @@ it('holt mit „Rückgängig“ genau die eigenen Artikel in ihre Warengruppen z
     ]);
 
     expect(rueckgaengigLeiste($screen))->toBeNull();
-
-    $vorrat = collect(listenAbschnitte(Native::visit('/vorrat')))
-        ->flatMap(fn (array $abschnitt) => $abschnitt['artikel']);
-
-    expect($vorrat)->not->toContain('Tofu')->not->toContain('Salz');
 });
 
 it('gibt der Leiste einen Textknopf in der Akzentfarbe', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     $screen = Native::visit('/')->press('alleAbhaken');
 
@@ -218,7 +227,7 @@ it('gibt der Leiste einen Textknopf in der Akzentfarbe', function () {
 });
 
 it('beschriftet das Kreuz der Leiste für Screenreader und räumt sie damit ab', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     $screen = Native::visit('/', platform: 'android')->press('alleAbhaken');
 
@@ -233,7 +242,7 @@ it('beschriftet das Kreuz der Leiste für Screenreader und räumt sie damit ab',
 });
 
 it('macht den Vorgang nach dem Kreuz nicht mehr rückgängig', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     $screen = Native::visit('/')
         ->press('alleAbhaken')
@@ -244,7 +253,10 @@ it('macht den Vorgang nach dem Kreuz nicht mehr rückgängig', function () {
 });
 
 it('räumt die Leiste beim Pull-to-Refresh ab', function () {
-    aufDieListe('tofu', 'salz');
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Fleischprodukte', position: 0),
+        mealieArtikel('Salz', label: 'Gewürze', position: 1),
+    ]);
 
     $screen = Native::visit('/')->press('alleAbhaken')->press('rueckgaengigMachen');
 
@@ -253,12 +265,13 @@ it('räumt die Leiste beim Pull-to-Refresh ab', function () {
     $screen->press('alleAbhaken')->press('neuLaden');
 
     expect(rueckgaengigLeiste($screen))->toBeNull();
-
-    $screen->press('rueckgaengigMachen')->assertSee('Liste ist leer.');
 });
 
 it('räumt die Leiste beim Öffnen der Einstellungen ab', function () {
-    aufDieListe('tofu', 'salz');
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Fleischprodukte', position: 0),
+        mealieArtikel('Salz', label: 'Gewürze', position: 1),
+    ]);
 
     $screen = Native::visit('/')->press('alleAbhaken')->press('oeffneEinstellungen');
 
@@ -267,12 +280,13 @@ it('räumt die Leiste beim Öffnen der Einstellungen ab', function () {
     $zurueck = $screen->followNavigation()->goBack();
 
     expect(rueckgaengigLeiste($zurueck))->toBeNull();
-
-    $zurueck->press('rueckgaengigMachen')->assertSee('Liste ist leer.');
 });
 
 it('räumt die Leiste beim Tipp auf eine Zeile ab', function () {
-    aufDieListe('tofu', 'salz');
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Fleischprodukte', position: 0),
+        mealieArtikel('Salz', label: 'Gewürze', position: 1),
+    ]);
 
     $screen = Native::visit('/')
         ->press('alleAbhaken')
@@ -283,7 +297,7 @@ it('räumt die Leiste beim Tipp auf eine Zeile ab', function () {
 });
 
 it('räumt die Leiste beim Tab-Wechsel ab', function () {
-    aufDieListe('tofu');
+    mitVorrat([vorratArtikel('Äpfel', label: 'Obst & Gemüse')], [mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     Native::visit('/')->press('alleAbhaken');
 
@@ -292,7 +306,7 @@ it('räumt die Leiste beim Tab-Wechsel ab', function () {
 });
 
 it('räumt die Leiste ab, wenn die App aus dem Hintergrund zurückkommt', function () {
-    aufDieListe('tofu');
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
 
     $screen = Native::visit('/')->press('alleAbhaken');
 
@@ -302,29 +316,38 @@ it('räumt die Leiste ab, wenn die App aus dem Hintergrund zurückkommt', functi
 });
 
 it('ersetzt eine stehende Leiste durch die des neuen Vorgangs', function () {
-    aufDieListe('tofu', 'salz');
+    mitMealie([
+        mealieArtikel('Tofu', label: 'Fleischprodukte', position: 0),
+        mealieArtikel('Salz', label: 'Gewürze', position: 1),
+    ]);
 
     $screen = Native::visit('/')->press('alleAbhaken');
 
-    // Erst den Vorrat wieder auf die Liste holen, ohne die Leiste zu
-    // berühren — dann steht ein zweiter Vorgang mit anderer Anzahl an.
-    aufDieListe('tofu');
+    expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('2 Artikel abgehakt');
 
-    $screen->press('alleAbhaken');
+    // Einen der beiden zurückholen, ohne die Leiste zu berühren — dann steht
+    // ein zweiter Vorgang mit anderer Anzahl an.
+    $screen->tap('Abgehakt (2)')->tap('Tofu')->press('alleAbhaken');
 
     expect(texteIn(rueckgaengigLeiste($screen) ?? []))->toContain('1 Artikel abgehakt');
-
-    $screen->press('rueckgaengigMachen');
-
-    expect(listenAbschnitte($screen))
-        ->toBe([['ueberschrift' => 'Kühlregal', 'artikel' => ['Tofu']]]);
 });
 
 it('lässt bei leerer Liste weder die Action noch eine Leiste stehen', function () {
+    mitMealie([]);
+
     $screen = Native::visit('/');
 
     $screen->assertMissingElement('top_bar_action', fn (array $node) => ($node['props']['a11y_label'] ?? null) === 'Alles abhaken')
         ->assertSee('Liste ist leer.');
 
     expect(rueckgaengigLeiste($screen))->toBeNull();
+});
+
+it('schickt keine eigene Liste mehr mit: alles, was dasteht, kommt aus Mealie', function () {
+    mitMealie([mealieArtikel('Tofu', label: 'Fleischprodukte')]);
+
+    Native::visit('/')->tap('Tofu');
+
+    Http::assertSent(fn ($anfrage) => $anfrage->method() === 'PUT'
+        && str_contains($anfrage->url(), '/api/households/shopping/items/'));
 });

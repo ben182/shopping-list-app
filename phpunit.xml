@@ -37,5 +37,6 @@
              in der lokalen .env abhängen. -->
         <env name="MEALIE_URL" value="https://mealie.example.test"/>
         <env name="MEALIE_SHOPPING_LIST_ID" value="00000000-0000-4000-8000-000000000000"/>
+        <env name="MEALIE_VORRAT_LIST_ID" value="00000000-0000-4000-8000-000000000001"/>
     </php>
 </phpunit>

@@ -59,7 +59,8 @@ Rutsch.
 Zu `.env`: die Datei ist gitignored und wird nie eingecheckt. Die
 `NATIVEPHP_*`-Platzhalter dürfen leer bleiben — `config/nativephp.php` und
 `config/mealie.php` setzen die Werte dieser App per `?:` selbst
-(App-ID `de.ben182.einkaufsliste`, Mealie-URL, Listen-ID).
+(App-ID `de.ben182.einkaufsliste`, Mealie-URL, Listen-IDs für Einkaufsliste und
+Vorrat).
 
 > **Achtung, alte Falle:** Ein leerer Platzhalter `FOO=` liefert `''` und nicht `null`.
 > Der zweite Parameter von `env()` greift dann *nicht*. Deshalb steht in den
@@ -246,65 +247,78 @@ echten Geräten ist das unkritisch, x86-Emulatoren installieren sie nicht.
 
 ---
 
-## 6. Katalog und Label-Aliase pflegen
+## 6. Vorrat, Warengruppen und Label-Aliase pflegen
 
-### Katalog-Artikel (`config/katalog.php`)
+### Der Vorrat (Mealie-Liste „Vorrat“)
 
-Der feste Artikelkatalog — 8 Gruppen, 112 Artikel — steht in `config/katalog.php`:
+Der Vorrat — was man immer im Haus haben will, von Äpfeln bis Toilettenpapier —
+steht **in Mealie**, als zweite Einkaufsliste neben der, die der Wochenplan füllt.
+Ihre ID steht in `config/mealie.php` (`vorrat_liste_id`, aus `MEALIE_VORRAT_LIST_ID`).
+
+- **Gepflegt wird sie in Mealie**, von allen im Haushalt — mit Mealies
+  Autovervollständigung, als Artikel mit Lebensmittel oder als blanke Notiz.
+  Die App hat dafür bewusst keine Oberfläche.
+- **Menge 0** lässt Mealie nur den Namen anzeigen; so legt das Einspielskript die
+  Artikel an. Eine Menge ist erlaubt, sie steht dann auch in der App.
+- **Die Reihenfolge ist die Anzeigereihenfolge** innerhalb einer Warengruppe:
+  Mealies `position`, danach der Erstellzeitpunkt.
+- **Das Label des Artikels ist seine Warengruppe.** Die Zuordnung läuft über
+  dieselbe Alias-Tabelle wie bei der Einkaufsliste (siehe unten).
+
+Ein Tap im Vorrat-Screen **kopiert** den Artikel auf die Einkaufsliste; im Vorrat
+bleibt er stehen und verschwindet dort nur so lange, wie er offen auf der
+Einkaufsliste steht. Ist er abgehakt, steht er wieder im Vorrat — sonst wäre der
+Vorrat nach einem Einkauf leer, bis jemand in Mealie aufräumt. Liegt derselbe
+Artikel schon abgehakt auf der Einkaufsliste, wird diese Zeile wieder geöffnet,
+statt eine zweite für dasselbe anzulegen.
+
+Erkannt wird „derselbe Artikel“ am Mealie-Lebensmittel, und wo es keines gibt, am
+Namen.
+
+### Warengruppen (`config/katalog.php`)
+
+Geblieben ist die Gliederung: 8 Warengruppen, ihre Reihenfolge und ihre Läden.
 
 ```php
 'gruppen' => [
     'obst-gemuese' => [
         'name' => 'Obst & Gemüse',
-        'laeden' => ['lidl', 'rewe'],
-        'artikel' => [
-            'aepfel'  => 'Äpfel',
-            'bananen' => 'Bananen',
-            // …
-        ],
+        'laeden' => ['lidl'],
     ],
     // …
 ],
 ```
 
-- **Reihenfolge ist Anzeigereihenfolge.** Sowohl die der Gruppen als auch die der
-  Artikel innerhalb einer Gruppe. Sie ist bewusst nicht alphabetisch, sondern folgt dem
-  Weg durch den Laden. Ein Artikel wandert im Regal, indem man seine Zeile verschiebt.
-- **Neuer Artikel:** eine Zeile `'id' => 'Anzeigename'` in der passenden Gruppe.
-- **Artikel umbenennen:** nur den Wert ändern, **nicht die ID.** Gespeichert wird im
-  Listen-Zustand ausschließlich die ID; wer sie ändert, verliert den Zustand dieses
-  Artikels (die App filtert unbekannte IDs beim Lesen still weg).
-- **Artikel entfernen:** Zeile löschen. Steht er gerade auf der Liste, verschwindet er
-  dort ebenfalls — ohne Fehler.
-
-Gelesen wird der Katalog nie direkt, sondern über `App\Katalog\Katalog`
-(`gruppen()`, `artikelIds()`, `kennt()`, `gruppiert()`, `imLaden()`).
+- **Reihenfolge ist Anzeigereihenfolge** — der Weg durch den Laden, nicht das
+  Alphabet. Überschriften, die nur aus einem Mealie-Label entstanden sind, stehen
+  alphabetisch dahinter.
+- Gelesen wird die Datei nie direkt, sondern über `App\Katalog\Katalog`
+  (`gruppen()`, `gruppeMitNamen()`, `reihenfolge()`).
 
 ### Läden (`laeden`)
 
 Über Einkaufsliste **und** Vorrat stehen dieselben Filter-Chips: **Alle · Lidl ·
-Rewe · Getränkemarkt**. Woher die App weiß, was es wo gibt, steht ebenfalls im
-Katalog.
+Rewe · Getränkemarkt**.
 
-- **Pro Gruppe:** `'laeden' => ['lidl', 'rewe']`. Jeder Artikel der Gruppe erbt das.
-- **Pro Artikel:** wo einer abweicht, steht statt des Anzeigenamens ein Array —
-  `'tempeh' => ['name' => 'Tempeh', 'laeden' => ['rewe']]`. Beide Schreibweisen
-  dürfen in derselben Gruppe stehen.
+- **Pro Warengruppe:** `'laeden' => ['lidl']` in `config/katalog.php`. Jeder
+  Artikel dieser Gruppe erbt es.
+- **Pro Artikel:** die Ausnahme steht **in Mealie**, als `extras.laeden` am
+  Listeneintrag — kommagetrennt, weil Mealies Extras nur flache Zeichenketten
+  halten (`'laeden' => 'rewe'`). Sie wird beim Kopieren in die Einkaufsliste
+  mitgenommen. In Mealies Weboberfläche ist `extras` nicht editierbar; gesetzt
+  wird es über die API.
 - **Erlaubte Schlüssel:** `lidl`, `rewe`, `getraenkemarkt` (`App\Katalog\Laden`).
   Ein unbekannter Schlüssel fällt still weg.
-- **Jeder Artikel gehört in genau einen Laden.** Steht er in zweien, trennen die
-  Chips nichts mehr und man läuft doch wieder durch die ganze Liste. Die
-  Aufteilung folgt dem Einkauf: `lidl` für Grundnahrungsmittel und alles Günstige
-  (98 Artikel), `rewe` für die veganen Spezialprodukte, die Lidl nicht führt (7),
-  `getraenkemarkt` für alles Trinkbare (7). Zwei Tests in
-  `tests/Feature/EinkaufenLaedenTest.php` halten die Regel fest — sie fallen um,
-  sobald ein Artikel in zwei oder in keinem Laden steht.
-- **Mehrere Läden je Artikel sind technisch weiterhin möglich.** Wer bewusst
-  abweicht, passt den Test mit an.
-- **Ohne `laeden` stünde ein Artikel in jedem Filter.** Dasselbe gilt für
-  Mealie-Artikel unter einer Überschrift, die es im Katalog nicht gibt: sie erben
-  nichts und bleiben deshalb überall stehen — ein übersehener Artikel wiegt
-  schwerer als eine Zeile zu viel.
+- **Jede Warengruppe gehört in genau einen Laden.** Steht sie in zweien, trennen
+  die Chips nichts mehr. Zwei Tests in `tests/Feature/EinkaufenLaedenTest.php`
+  halten die Regel fest.
+- **Ohne jede Zuordnung steht ein Artikel in jedem Filter.** Das gilt für alles
+  unter einer Überschrift, die es im Katalog nicht gibt — etwa ein Lebensmittel,
+  das gerade frisch aus einem Rezept entstanden ist: es erbt nichts und bleibt
+  überall stehen. Ein übersehener Artikel wiegt schwerer als eine Zeile zu viel.
+
+Die Regel entscheidet in dieser Reihenfolge (`App\Katalog\Ladenzuordnung`):
+`extras.laeden` am Artikel → `laeden` seiner Warengruppe → überall sichtbar.
 
 Der gewählte Laden gilt für die ganze Sitzung (`App\Katalog\Ladenfilter`, ein
 Singleton) und übersteht Tab-Wechsel, nicht aber den App-Start. **Einkaufen und
@@ -323,22 +337,21 @@ und wird von beiden Screens per `@include` eingebunden. Ein Include läuft nicht
 Kontext der Komponente: `$laeden` und `$gewaehlterLaden` gehen als Parameter rein,
 den Handler `ladenWaehlen()` muss der einbindende Screen mitbringen.
 
-> **Katalogänderungen brauchen ein App-Update.** Der Katalog ist eine
-> Konfigurationsdatei und wird beim Bauen in die APK gepackt. Es gibt bewusst keine
-> UI, um Artikel anzulegen. Nach einer Änderung also `php artisan native:run android`
-> (bzw. `native:package` und neu installieren) — die gespeicherte Liste überlebt das
-> Update, die Migrationen löschen den Listen-Zustand nie.
+> **Artikel ändern heißt Mealie ändern, nicht neu bauen.** Nur die Warengruppen
+> und ihre Läden stecken in der Konfiguration und damit in der APK — dafür
+> braucht es weiterhin `php artisan native:run android` (bzw. `native:package`
+> und neu installieren).
 
 ### Label-Aliase (`config/mealie.php`)
 
-Mealie-Artikel werden auf dem Einkaufen-Screen in die Katalog-Gruppen einsortiert. Die
-Zuordnung läuft in dieser Reihenfolge:
+Mealie-Artikel werden auf Einkaufen- und Vorrat-Screen in die Warengruppen
+einsortiert. Die Zuordnung läuft in dieser Reihenfolge:
 
-1. Das Mealie-Label heißt (nach `trim()`, exakt) wie eine Katalog-Gruppe → diese
+1. Das Mealie-Label heißt (nach `trim()`, exakt) wie eine Warengruppe → diese
    Gruppe.
 2. Das Label steht in `label_aliase` → die dort genannte Gruppe.
 3. Nichts davon → eine **eigene Gruppe mit dem Label als Überschrift**, unterhalb der
-   Katalog-Gruppen.
+   Warengruppen.
 4. Kein Label → die Gruppe aus `gruppe_ohne_label` (`Sonstiges`).
 
 ```php
@@ -350,8 +363,9 @@ Zuordnung läuft in dieser Reihenfolge:
 ],
 ```
 
-Links steht der Mealie-Label-Name, rechts der **Name** der Katalog-Gruppe (nicht die
-ID). Für ein neues Mealie-Label muss man nichts tun — es erscheint von allein als
+Links steht der Mealie-Label-Name, rechts der **Name** der Warengruppe (nicht die
+ID). Die Vorratsliste trägt Labels, die genau so heißen wie die Warengruppen und
+deshalb keinen Alias brauchen; die Aliase fangen die rezeptgetriebenen Labels ab. Für ein neues Mealie-Label muss man nichts tun — es erscheint von allein als
 eigene Gruppe. Ein Alias ist nur nötig, wenn es mit einer bestehenden Gruppe
 verschmelzen soll. Auch das ist eine Konfigurationsdatei: **Aliase ändern heißt neu
 bauen.**
@@ -432,15 +446,15 @@ Gerät, einen Emulator oder eine erreichbare Mealie-Instanz.
 app/
 ├── NativeComponents/   Screens: Einkaufen, Vorrat, Wochenplan, Einstellungen
 ├── Layouts/            TabsLayout (Root-Screens), StackLayout (gepushte Screens)
-├── Katalog/            Katalog, Gruppe, Artikel, Laden, Ladenfilter — config/katalog.php
-├── Liste/              EigeneListe — der lokale Listen-Zustand in SQLite
-├── Einkaufen/          Zusammenführung eigener und Mealie-Artikel
+├── Katalog/            Warengruppen, Laden, Ladenfilter, Ladenzuordnung — config/katalog.php
+├── Vorrat/             Vorratsliste, Sitzung, Cache, Übersicht, Hinzufügen — die Mealie-Liste „Vorrat“
+├── Einkaufen/          Übersicht, Abschnitt, Zeile, Abhakvorgang — der Einkaufen-Screen
 ├── Mealie/             Token, Verbindung, Einkaufsliste, Sitzung, Cache, Fehler
 ├── Wochenplan/         Wochenberechnung und Mealplan-Sitzung
 └── Icons/              generierte Icon-Enums (php artisan native-ui:generate-icons)
 
-config/katalog.php      Artikelkatalog (8 Gruppen, 112 Artikel) samt Laden-Zuordnung
-config/mealie.php       Mealie-URL, Listen-ID, Timeout, Label-Aliase
+config/katalog.php      Warengruppen (8) samt Laden-Zuordnung — die Artikel stehen in Mealie
+config/mealie.php       Mealie-URL, Listen-IDs (Einkauf und Vorrat), Timeout, Label-Aliase
 config/nativephp.php    App-ID, SDK-Versionen, Theme, cleanup_env_keys, Hot-Reload
 routes/mobile.php       Screen-Routen (wird vom Package-Provider geladen, nicht in bootstrap/app.php)
 resources/views/native/ Blade-Views der Screens
